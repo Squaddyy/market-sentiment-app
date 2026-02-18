@@ -26,7 +26,7 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: High Contrast Sidebar ---
+# --- CUSTOM CSS: THE "NUCLEAR" FIX ---
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -36,40 +36,29 @@ st.markdown("""
         background-size: 30px 30px;
     }
     
-    /* 2. Cards */
-    .stMetric { 
-        background-color: #ffffff; 
-        padding: 15px; 
-        border-radius: 10px; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-        border: 1px solid #e2e8f0;
-    }
-
-    /* 3. Sidebar Container */
+    /* 2. Sidebar Container */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         border-right: 1px solid #334155;
     }
-    
-    /* 4. Sidebar Text Fixes (Force White/Light) */
+
+    /* 3. SIDEBAR TEXT VISIBILITY FIX (The "Nuclear" Option) */
+    /* Forces ALL text in sidebar to be white... */
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label {
-        color: #f8fafc !important; /* Bright White-Blue */
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] p {
+        color: #ffffff !important;
     }
-    
-    /* 5. Sidebar Caption Fix */
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        color: #cbd5e1 !important; /* Light Gray for captions */
+
+    /* 4. ...EXCEPT Input Boxes (must be Black text on White bg) */
+    [data-testid="stSidebar"] input {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
     }
-    
-    /* 6. Input Box Fixes (White Box, Dark Text) */
-    [data-testid="stSidebar"] input { 
-        color: #0f172a !important; 
-        font-weight: 600;
-    }
+    /* Fix Dropdown Menu Text (Black text on White bg) */
     div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -77,21 +66,36 @@ st.markdown("""
     div[data-baseweb="select"] span {
         color: #0f172a !important;
     }
+    /* Fix Dropdown Popup Menu */
+    div[role="listbox"] li {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+    }
+
+    /* 5. METRIC CARDS */
+    .stMetric { 
+        background-color: #ffffff; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+        border: 1px solid #e2e8f0;
+    }
     
-    /* 7. Button Styling */
-    div.stButton > button:first-child {
-        background-color: #ffffff;
-        color: #0f172a;
+    /* 6. BUTTON STYLING (Fixes Favorites Visibility) */
+    div.stButton > button {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 8px;
         font-weight: bold;
-        border: none;
-        height: 3em;
-        width: 100%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         transition: all 0.3s ease;
     }
     div.stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
     }
     
     footer {visibility: hidden;}
