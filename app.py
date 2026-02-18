@@ -13,14 +13,15 @@ if 'favorites' not in st.session_state:
     st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state:
     st.session_state.manual_ticker = ""
+if 'run_analysis' not in st.session_state:
+    st.session_state.run_analysis = False
 
-# CALLBACK: This is the fix for the Favorites buttons
+# CALLBACK: Fixes the Favorites buttons by updating state and triggering rerun
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
-    # We force an analysis run immediately
     st.session_state.run_analysis = True
 
-# CUSTOM CSS: Fixed text visibility and Terminal design
+# CUSTOM CSS: High-contrast text and Premium Terminal design
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -71,9 +72,7 @@ with st.sidebar:
     dropdown_name = st.selectbox("Choose from list:", sorted_keys)
     dropdown_ticker = current_list[dropdown_name]
     
-    # Text input linked to session state for favorites functionality
     ticker_input = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", key="manual_ticker")
-    
     final_ticker = ticker_input.upper() if ticker_input else dropdown_ticker
     
     st.markdown(f"""
@@ -92,7 +91,7 @@ with st.sidebar:
             st.toast(f"Added {final_ticker}")
 
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
-    analyze_btn = st.button("Execute Analysis ⚡", key="main_analyze_btn")
+    analyze_btn = st.button("Execute Analysis ⚡")
     
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.divider()
@@ -100,11 +99,8 @@ with st.sidebar:
     st.caption("Your neighborhood programmer")
 
 # --- MAIN DASHBOARD LOGIC ---
-# Analysis triggers if button is pressed OR if a favorite was just clicked
 if analyze_btn or st.session_state.get('run_analysis'):
-    # Reset the flag
     st.session_state.run_analysis = False
-    
     try:
         stock = yf.Ticker(final_ticker)
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
@@ -112,16 +108,11 @@ if analyze_btn or st.session_state.get('run_analysis'):
         with tabs[0]:
             history = stock.history(period="6mo")
             if not history.empty:
-                try:
-                    info = stock.info
-                    current = info.get('currentPrice') or history['Close'].iloc[-1]
-                    prev_close = info.get('previousClose') or history['Close'].iloc[-2]
-                except:
-                    current = history['Close'].iloc[-1]
-                    prev_close = history['Close'].iloc[-2]
-
+                info = stock.info
+                current = info.get('currentPrice') or history['Close'].iloc[-1]
+                prev_close = info.get('previousClose') or history['Close'].iloc[-2]
                 st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{current - prev_close:.2f}")
-                st.caption("*Note: Data may have a 15-min delay (Standard for free APIs).*")
+                st.caption("*Note: Data may have a 15-min delay.*")
                 
                 fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
                 fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
@@ -136,70 +127,66 @@ if analyze_btn or st.session_state.get('run_analysis'):
                     if story.get('summary'):
                         res = pipe(story['summary'])[0]
                         results.append({"title": story['title'], "label": res['label']})
-                
                 if results:
+                    c1, c2 = st.columns(2)
                     pos = sum(1 for r in results if r['label'] == 'positive')
                     neg = sum(1 for r in results if r['label'] == 'negative')
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Positive", pos)
-                    c2.metric("Negative", neg, delta_color="inverse")
-                    c3.metric("Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
-                    for r in results:
-                        st.write(f"- {r['title']}")
+                    c1.metric("Sentiment", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                    for r in results: st.write(f"- {r['title']}")
 
         with tabs[2]:
             st.subheader("📋 Fundamentals")
             try:
                 info = stock.info
-                k1, k2, k3 = st.columns(3)
+                k1, k2 = st.columns(2)
                 k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
                 k2.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
-                k3.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
-                
-                # Ownership Pie
                 inst = info.get('heldPercentInstitutions', 0) * 100
-                insider = info.get('heldPercentInsiders', 0) * 100
-                fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
+                fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Retail'], values=[inst, 100-inst], hole=.3)])
                 st.plotly_chart(fig_own, use_container_width=True)
-            except:
-                st.error("Fundamental data unavailable.")
+            except: st.error("Data unavailable.")
 
-    except Exception as e:
-        st.error(f"Analysis Error: {e}")
+    except Exception as e: st.error(f"Error: {e}")
 else:
-    # --- WELCOME SCREEN WITH FIXED HEATMAP & CLICKABLE FAVORITES ---
+    # --- WELCOME SCREEN WITH PRO DRILL-DOWN HEATMAP ---
     st.subheader(f"👋 Welcome to your terminal!")
-    
     col_fav, col_heat = st.columns([1, 2])
     
     with col_fav:
         st.markdown("### ⭐ Your Favorites")
         if st.session_state.favorites:
             for fav in st.session_state.favorites:
-                # Callback fix: clicking this button now reloads the app with this ticker
                 st.button(f"🔍 Analyze {fav}", key=f"fav_{fav}", on_click=select_favorite, args=(fav,))
-        else:
-            st.write("No favorites yet. Add some in the sidebar!")
+        else: st.write("Add favorites in the sidebar!")
 
     with col_heat:
-        st.markdown("### 🗺️ Live Sector Performance (Nifty)")
-        sectors = {"Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "Nifty Auto": "NIFTY_AUTO.NS", "Nifty Pharma": "NIFTY_PHARMA.NS"}
-        
+        st.markdown("### 🗺️ Live Market Map (Drill-down Enabled)")
+        # PRO DATA: Mapping Sectors to constituents
+        sector_map = {
+            "Nifty Bank": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS"],
+            "Nifty IT": ["TCS.NS", "INFY.NS", "HCLTECH.NS"],
+            "Nifty Auto": ["TATAMOTORS.NS", "MARUTI.NS"],
+            "Nifty Energy": ["RELIANCE.NS", "NTPC.NS"]
+        }
         heat_results = []
-        for name, tick in sectors.items():
+        for sector, stocks in sector_map.items():
             try:
-                s_data = yf.Ticker(tick).history(period="1d")
-                change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
-                heat_results.append({"Sector": name, "Performance": change, "Group": "Market"})
+                # Add sector base
+                heat_results.append({"Label": sector, "Parent": "Market", "Performance": 0})
+                for s in stocks:
+                    s_data = yf.Ticker(s).history(period="1d")
+                    change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
+                    heat_results.append({"Label": s.replace(".NS", ""), "Parent": sector, "Performance": change})
             except: continue
                 
         if heat_results:
             df_heat = pd.DataFrame(heat_results)
-            # Fix: Added 'maxdepth=1' to prevent the blank screen drill-down
-            fig_heat = px.treemap(df_heat, path=['Group', 'Sector'], values=[1]*len(df_heat),
+            # Treemap with hierarchy to allow drilling down
+            fig_heat = px.treemap(df_heat, path=['Parent', 'Label'], values=[1]*len(df_heat),
                                  color='Performance', color_continuous_scale='RdYlGn',
                                  color_continuous_midpoint=0, range_color=[-3, 3])
             fig_heat.update_layout(margin=dict(t=0, l=0, r=0, b=0))
+            fig_heat.update_traces(textinfo="label+value")
             st.plotly_chart(fig_heat, use_container_width=True)
 
-    st.info("Ready? Select an instrument or click a favorite and hit **Execute Analysis**.")
+    st.info("Select a stock or click a favorite to start analysis.")
