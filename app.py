@@ -8,20 +8,16 @@ from transformers import pipeline
 # 1. Page Configuration
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# Initialize Session State
-if 'favorites' not in st.session_state:
-    st.session_state.favorites = []
-if 'manual_ticker' not in st.session_state:
-    st.session_state.manual_ticker = ""
-if 'run_analysis' not in st.session_state:
-    st.session_state.run_analysis = False
+# --- Persistent Session State ---
+if 'favorites' not in st.session_state: st.session_state.favorites = []
+if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
+if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
 
-# CALLBACK: For Favorites
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# CUSTOM CSS
+# --- Professional UI Styling ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -38,23 +34,22 @@ st.markdown("""
 st.title("📈 Market Analyzer Pro")
 st.caption("One dashboard for all your finance things")
 
-# --- Optimized Data Fetching with Caching ---
-@st.cache_data(ttl=600)  # Cache results for 10 minutes to avoid rate limits
-def get_stock_info(ticker):
-    try:
-        s = yf.Ticker(ticker)
-        return s.info
-    except:
-        return None
-
+# --- Cached AI & Data Engines ---
 @st.cache_resource
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
+@st.cache_data(ttl=600) # Prevents Rate Limiting
+def fetch_info(ticker):
+    try:
+        return yf.Ticker(ticker).info
+    except:
+        return None
+
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
-# --- THE MEGA LIST ---
+# --- Master Ticker Lists ---
 INDICES = {"Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"}
 STOCKS = {
     "Adani Ent": "ADANIENT.NS", "Asian Paints": "ASIANPAINT.NS", "Axis Bank": "AXISBANK.NS",
@@ -68,40 +63,35 @@ STOCKS = {
     "Vedanta": "VEDL.NS", "Wipro": "WIPRO.NS", "Zomato": "ZOMATO.NS"
 }
 
-# --- SIDEBAR ---
+# --- Sidebar Controls ---
 with st.sidebar:
     st.header("🎛️ Terminal Controls")
     asset_class = st.selectbox("Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
     st.divider()
     
     current_list = INDICES if asset_class == "Indices (Market View)" else STOCKS
-    sorted_keys = sorted(list(current_list.keys()))
-    dropdown_name = st.selectbox("Choose from list:", sorted_keys)
-    dropdown_ticker = current_list[dropdown_name]
+    dropdown_name = st.selectbox("Choose from list:", sorted(list(current_list.keys())))
     
     ticker_input = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", key="manual_ticker_input")
-    final_ticker = ticker_input.upper() if ticker_input else dropdown_ticker
+    final_ticker = ticker_input.upper() if ticker_input else current_list[dropdown_name]
     
     st.markdown(f"""<div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 5px solid #60a5fa;">
         <strong style="color: white; font-size: 1.1em;">{final_ticker}</strong></div>""", unsafe_allow_html=True)
     
     if st.button("⭐ Add/Remove Favorite"):
-        if final_ticker in st.session_state.favorites:
-            st.session_state.favorites.remove(final_ticker)
-            st.toast(f"Removed {final_ticker}")
-        else:
-            st.session_state.favorites.append(final_ticker)
-            st.toast(f"Added {final_ticker}")
+        if final_ticker in st.session_state.favorites: st.session_state.favorites.remove(final_ticker)
+        else: st.session_state.favorites.append(final_ticker)
+        st.rerun()
 
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
     analyze_btn = st.button("Execute Analysis ⚡")
     
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
 
-# --- MAIN LOGIC ---
+# --- Dashboard Display ---
 if analyze_btn or st.session_state.run_analysis:
     st.session_state.run_analysis = False
     try:
@@ -112,8 +102,8 @@ if analyze_btn or st.session_state.run_analysis:
             history = stock.history(period="6mo")
             if not history.empty:
                 current = history['Close'].iloc[-1]
-                prev_close = history['Close'].iloc[-2]
-                st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{current - prev_close:.2f}")
+                change = current - history['Close'].iloc[-2]
+                st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f}")
                 st.caption("*Note: Data may have a 15-min delay.*")
                 
                 fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
@@ -138,9 +128,7 @@ if analyze_btn or st.session_state.run_analysis:
 
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
-            # Using the cached function here to save API calls
-            info = get_stock_info(final_ticker)
-            
+            info = fetch_info(final_ticker) # Uses the Cache
             if info and len(info) > 10:
                 k1, k2, k3 = st.columns(3)
                 k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
@@ -148,40 +136,33 @@ if analyze_btn or st.session_state.run_analysis:
                 k3.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
                 
                 st.divider()
-                p1, p2 = st.columns(2)
-                with p1:
-                    inst = info.get('heldPercentInstitutions', 0) * 100
-                    insider = info.get('heldPercentInsiders', 0) * 100
-                    fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
-                    fig_own.update_layout(title="Ownership Pattern")
-                    st.plotly_chart(fig_own, use_container_width=True)
-                with p2:
-                    st.write(f"**Sector:** {info.get('sector', 'N/A')}")
-                    st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                st.subheader("🏦 Ownership Pattern")
+                inst = info.get('heldPercentInstitutions', 0) * 100
+                insider = info.get('heldPercentInsiders', 0) * 100
+                fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
+                st.plotly_chart(fig_own, use_container_width=True)
             else:
-                st.warning("⚠️ Fundamentals are temporarily locked by the API provider.")
-                if st.button("Retry Fetch 🔄"):
-                    st.cache_data.clear() # Clears cache to try again
-                    st.rerun()
+                st.warning("⚠️ Data locked by API provider. Wait 5 mins and click below.")
+                if st.button("Retry Fetch 🔄"): st.cache_data.clear(); st.rerun()
 
-    except Exception as e:
-        st.error(f"Analysis Error: {e}")
+    except Exception as e: st.error(f"Analysis Error: {e}")
 else:
-    # --- WELCOME SCREEN ---
+    # --- Welcome Screen ---
     st.subheader(f"👋 Welcome to your terminal!")
     col_fav, col_heat = st.columns([1, 2])
-    
     with col_fav:
         st.markdown("### ⭐ Your Favorites")
-        if st.session_state.favorites:
-            for fav in st.session_state.favorites:
-                st.button(f"🔍 Analyze {fav}", key=f"fav_{fav}", on_click=select_favorite, args=(fav,))
-        else: st.write("Add favorites in the sidebar!")
-
+        for fav in st.session_state.favorites:
+            st.button(f"🔍 Analyze {fav}", key=f"fav_{fav}", on_click=select_favorite, args=(fav,))
     with col_heat:
-        st.markdown("### 🗺️ Market Map")
-        # Sector logic... (same as previous)
-        sector_map = {"Nifty Bank": ["HDFCBANK.NS", "SBIN.NS"], "Nifty IT": ["TCS.NS", "INFY.NS"], "Nifty Auto": ["MARUTI.NS"], "Nifty Energy": ["RELIANCE.NS"]}
+        st.markdown("### 🗺️ Live Market Map")
+        # Added full sector constituencies for drill-down
+        sector_map = {
+            "Nifty Bank": ["HDFCBANK.NS", "SBIN.NS", "ICICIBANK.NS"],
+            "Nifty IT": ["TCS.NS", "INFY.NS", "HCLTECH.NS"],
+            "Nifty Auto": ["TATAMOTORS.NS", "MARUTI.NS", "BAJAJ-AUTO.NS"],
+            "Nifty Energy": ["RELIANCE.NS", "NTPC.NS", "ONGC.NS"]
+        }
         heat_results = []
         for sector, stocks in sector_map.items():
             try:
