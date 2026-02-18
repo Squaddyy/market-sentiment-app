@@ -12,22 +12,38 @@ st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="w
 if 'favorites' not in st.session_state: st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
+if 'api_status' not in st.session_state: st.session_state.api_status = "Pro Mode"
 
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- CUSTOM CSS: The "Cool Slate" Tech Look ---
+# --- Helper: Currency Formatter (The Fix for Ugly Numbers) ---
+def format_currency(value):
+    if not isinstance(value, (int, float)):
+        return value
+    if value >= 1e12:
+        return f"₹{value/1e12:.2f}T"
+    elif value >= 1e9:
+        return f"₹{value/1e9:.2f}B"
+    elif value >= 1e7:
+        return f"₹{value/1e7:.2f}Cr"
+    elif value >= 1e5:
+        return f"₹{value/1e5:.2f}L"
+    else:
+        return f"₹{value:,.2f}"
+
+# --- CUSTOM CSS: Cool Slate Tech Look ---
 st.markdown("""
     <style>
-    /* 1. Main Background: Cool Slate with Subtle Grid */
+    /* 1. Main Background */
     .main {
-        background-color: #f1f5f9; /* Slightly darker than white for contrast */
+        background-color: #f1f5f9;
         background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
         background-size: 30px 30px;
     }
     
-    /* 2. Cards: crisp white, floating effect */
+    /* 2. Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -36,19 +52,19 @@ st.markdown("""
         border: 1px solid #e2e8f0;
     }
 
-    /* 3. Sidebar: Deep "Midnight" Blue */
+    /* 3. Sidebar */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         color: white;
         border-right: 1px solid #334155;
     }
     
-    /* 4. Input & Text Fixes */
+    /* 4. Inputs */
     [data-testid="stSidebar"] input { color: #1e293b !important; }
     div[data-baseweb="select"] * { color: #1e293b !important; }
     [data-testid="stSidebar"] label { color: white !important; font-weight: 600; font-size: 0.9rem; }
     
-    /* 5. Button Styling */
+    /* 5. Buttons */
     div.stButton > button:first-child {
         background-color: #ffffff;
         color: #0f172a;
@@ -63,7 +79,6 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -71,35 +86,48 @@ st.markdown("""
 st.title("📈 Market Analyzer Pro")
 st.caption("One dashboard for all your finance things")
 
-# --- Robust Caching Strategy ---
+# --- AI Engine ---
 @st.cache_resource
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
-# HYBRID FETCHING FUNCTION
+# --- HYBRID FETCHING LOGIC (With Formatting Fix) ---
 @st.cache_data(ttl=3600)
 def get_fundamental_info(ticker):
     stock = yf.Ticker(ticker)
+    
+    # Strategy 1: Rich Data (Pro Mode)
     try:
-        # Strategy 1: Rich Data
         info = stock.info
-        if info and len(info) > 5: return info
+        if info and len(info) > 5:
+            return {
+                "status": "Pro",
+                "mcap": f"₹{info.get('marketCap', 0):,}",
+                "pe": info.get('trailingPE', 'N/A'),
+                "high": f"₹{info.get('fiftyTwoWeekHigh', 0):,}",
+                "low": f"₹{info.get('fiftyTwoWeekLow', 0):,}",
+                "div": f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%",
+                "vol": f"{info.get('averageVolume', 0):,}",
+                "inst": info.get('heldPercentInstitutions', 0) * 100,
+                "insider": info.get('heldPercentInsiders', 0) * 100,
+                "sector": info.get('sector', 'N/A'),
+                "industry": info.get('industry', 'N/A')
+            }
     except: pass
     
+    # Strategy 2: Lite Data (Safe Mode)
     try:
-        # Strategy 2: Lite Data
         fast = stock.fast_info
         return {
-            'marketCap': fast.market_cap,
-            'fiftyTwoWeekHigh': fast.year_high,
-            'fiftyTwoWeekLow': fast.year_low,
-            'averageVolume': fast.last_volume,
-            'trailingPE': 'N/A (Lite)',
-            'dividendYield': 0,
-            'heldPercentInstitutions': 0,
-            'heldPercentInsiders': 0,
-            'sector': 'Basic Data Mode',
-            'industry': 'Rate Limit Bypass Active'
+            "status": "Lite",
+            "mcap": format_currency(fast.market_cap), # Clean Format
+            "pe": "N/A (Lite)",
+            "high": format_currency(fast.year_high),  # Clean Format
+            "low": format_currency(fast.year_low),    # Clean Format
+            "div": "N/A",
+            "vol": f"{fast.last_volume:,}",
+            "sector": "Basic Data Mode",
+            "industry": "Rate Limit Bypass Active"
         }
     except: return None
 
@@ -167,7 +195,7 @@ if analyze_btn or st.session_state.run_analysis:
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
         with tabs[0]:
-            # Main Price Display
+            # Main Price Metrics
             current = history['Close'].iloc[-1]
             prev_close = history['Close'].iloc[-2]
             change = current - prev_close
@@ -176,7 +204,7 @@ if analyze_btn or st.session_state.run_analysis:
             st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
             st.caption("*Note: Data may have a 15-min delay.*")
             
-            # Restored Detailed Metrics
+            # Detailed Stats Row (Always Safe)
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Open", f"₹{history['Open'].iloc[-1]:,.2f}")
             c2.metric("High", f"₹{history['High'].iloc[-1]:,.2f}")
@@ -224,35 +252,42 @@ if analyze_btn or st.session_state.run_analysis:
 
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
-            info = get_fundamental_info(final_ticker)
+            data = get_fundamental_info(final_ticker)
             
-            if info:
+            if data:
+                # API Status Badge
+                if data['status'] == "Pro":
+                    st.success("API Status: Pro Mode (Live)")
+                else:
+                    st.warning("API Status: Lite Mode (Rate Limit Bypass Active)")
+
                 k1, k2, k3 = st.columns(3)
-                k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
-                k1.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
-                k2.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
-                k2.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,}")
-                k3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
-                k3.metric("Avg Volume", f"{info.get('averageVolume', 0):,}")
+                k1.metric("Market Cap", data['mcap'])
+                k1.metric("P/E Ratio", data['pe'])
+                k2.metric("52W High", data['high'])
+                k2.metric("52W Low", data['low'])
+                k3.metric("Div. Yield", data['div'])
+                k3.metric("Avg Volume", data['vol'])
                 
                 st.divider()
                 st.subheader("🏦 Ownership & Peers")
                 
-                if info.get('sector') != 'Basic Data Mode':
+                if data['status'] == "Pro":
                     p1, p2 = st.columns(2)
                     with p1:
-                        inst = info.get('heldPercentInstitutions', 0) * 100
-                        insider = info.get('heldPercentInsiders', 0) * 100
+                        inst = data['inst']
+                        insider = data['insider']
                         fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
                         fig_own.update_layout(title="Shareholding Pattern")
                         st.plotly_chart(fig_own, use_container_width=True)
                     with p2:
-                        st.write(f"**Sector:** {info.get('sector', 'N/A')}")
-                        st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                        st.write(f"**Sector:** {data['sector']}")
+                        st.write(f"**Industry:** {data['industry']}")
                         st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
-                else: st.info("ℹ️ Running in 'Lite Mode'. Ownership charts paused.")
+                else:
+                    st.info("ℹ️ Ownership charts are paused in Lite Mode to maintain app stability.")
             else:
-                st.warning("⚠️ Fundamentals unavailable. Price & Sentiment remain live.")
+                st.error("⚠️ Fundamentals unavailable. Price & Sentiment remain live.")
                 if st.button("Force Retry 🔄"): st.cache_data.clear(); st.rerun()
     else: st.error(f"Could not fetch data for {final_ticker}. Please check the ticker symbol.")
 
