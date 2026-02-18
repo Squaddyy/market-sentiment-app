@@ -8,7 +8,7 @@ from transformers import pipeline
 # 1. Page Configuration
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# --- Persistent Session State ---
+# --- Session State ---
 if 'favorites' not in st.session_state: st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
@@ -17,7 +17,7 @@ def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Currency Formatter ---
+# --- Currency Formatter (Kept this because it's essential for Pro look) ---
 def format_currency(value):
     if not isinstance(value, (int, float)): return value
     if value >= 1e12: return f"₹{value/1e12:.2f}T"
@@ -26,78 +26,15 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: THE "NUCLEAR" FIX ---
+# --- CSS Styling ---
 st.markdown("""
     <style>
-    /* 1. Main Background */
-    .main {
-        background-color: #f1f5f9;
-        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-        background-size: 30px 30px;
-    }
-    
-    /* 2. Sidebar Container */
-    [data-testid="stSidebar"] {
-        background-image: linear-gradient(#1e293b, #0f172a);
-        border-right: 1px solid #334155;
-    }
-
-    /* 3. SIDEBAR TEXT VISIBILITY FIX (The "Nuclear" Option) */
-    /* Forces ALL text in sidebar to be white... */
-    [data-testid="stSidebar"] h1, 
-    [data-testid="stSidebar"] h2, 
-    [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] span, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p {
-        color: #ffffff !important;
-    }
-
-    /* 4. ...EXCEPT Input Boxes (must be Black text on White bg) */
-    [data-testid="stSidebar"] input {
-        color: #0f172a !important;
-        background-color: #ffffff !important;
-    }
-    /* Fix Dropdown Menu Text (Black text on White bg) */
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #0f172a !important;
-    }
-    /* Fix Dropdown Popup Menu */
-    div[role="listbox"] li {
-        color: #0f172a !important;
-        background-color: #ffffff !important;
-    }
-
-    /* 5. METRIC CARDS */
-    .stMetric { 
-        background-color: #ffffff; 
-        padding: 15px; 
-        border-radius: 10px; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-        border: 1px solid #e2e8f0;
-    }
-    
-    /* 6. BUTTON STYLING (Fixes Favorites Visibility) */
-    div.stButton > button {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 8px;
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        transition: all 0.3s ease;
-    }
-    div.stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border-color: #3b82f6 !important;
-        color: #3b82f6 !important;
-    }
-    
+    .main { background-color: #f1f5f9; background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 30px 30px; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+    [data-testid="stSidebar"] { background-image: linear-gradient(#1e293b, #0f172a); color: white; }
+    [data-testid="stSidebar"] input { color: #1e293b !important; }
+    div[data-baseweb="select"] * { color: #1e293b !important; }
+    div.stButton > button:first-child { background-color: #ffffff; color: #0f172a; border-radius: 8px; font-weight: bold; width: 100%; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -158,12 +95,15 @@ with st.sidebar:
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
 
-# --- Main Logic ---
+# --- Main Logic (Direct & Simple) ---
 if analyze_btn or st.session_state.run_analysis:
     st.session_state.run_analysis = False
     
     try:
+        # 1. Single Connection Point
         stock = yf.Ticker(final_ticker)
+        
+        # 2. Get History First (Fastest)
         history = stock.history(period="6mo")
         
         if not history.empty:
@@ -220,8 +160,11 @@ if analyze_btn or st.session_state.run_analysis:
 
             with tabs[2]:
                 st.subheader("📋 Fundamental Profile")
+                
+                # Direct Fetch - No Hybrid Complexity
                 try:
-                    info = stock.info
+                    info = stock.info # The "Heavy" Call you preferred
+                    
                     if info:
                         k1, k2, k3 = st.columns(3)
                         k1.metric("Market Cap", format_currency(info.get('marketCap', 0)))
@@ -244,7 +187,8 @@ if analyze_btn or st.session_state.run_analysis:
                             st.write(f"**Sector:** {info.get('sector', 'N/A')}")
                             st.write(f"**Industry:** {info.get('industry', 'N/A')}")
                             st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
-                    else: st.error("Fundamental data not found.")
+                    else:
+                        st.error("Fundamental data not found.")
                 except Exception as e:
                     st.error("⚠️ Fundamentals unavailable (Rate Limit or Data Missing).")
                     if st.button("Retry Fetch 🔄"): st.rerun()
