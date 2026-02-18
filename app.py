@@ -103,7 +103,7 @@ with st.sidebar:
 if analyze_btn:
     try:
         stock = yf.Ticker(ticker)
-        tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals"])
+        tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
         with tabs[0]:
             history = stock.history(period="6mo")
@@ -120,7 +120,6 @@ if analyze_btn:
                 pct_change = (change / prev_close) * 100
 
                 st.metric(label=f"{ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
-                # THE DATA DISCLAIMER -
                 st.caption("*Note: Data may have a 15-min delay (Standard for free APIs).*")
                 
                 t1, t2, t3, t4 = st.columns(4)
@@ -176,6 +175,24 @@ if analyze_btn:
                     k2.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,}")
                     k3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
                     k3.metric("Avg Volume", f"{info.get('averageVolume', 0):,}")
+                    
+                    st.divider()
+                    st.subheader("🏦 Ownership & Peers")
+                    p1, p2 = st.columns(2)
+                    with p1:
+                        # Ownership data
+                        inst_own = info.get('heldPercentInstitutions', 0) * 100
+                        insider_own = info.get('heldPercentInsiders', 0) * 100
+                        fig_own = go.Figure(data=[go.Pie(labels=['Institutions', 'Insiders', 'Retail/Other'], 
+                                                        values=[inst_own, insider_own, 100 - inst_own - insider_own],
+                                                        hole=.3)])
+                        fig_own.update_layout(title="Shareholding Pattern")
+                        st.plotly_chart(fig_own, use_container_width=True)
+                    with p2:
+                        # Simple Peer Comparison
+                        st.write(f"**Sector:** {info.get('sector', 'N/A')}")
+                        st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                        st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
                 else:
                     st.warning("Key stats currently on cooldown due to API limits.")
             except:
@@ -184,13 +201,13 @@ if analyze_btn:
     except Exception as e:
         st.error(f"Analysis Error: {e}")
 else:
-    # THE WELCOME SCREEN
+    # THE GENERIC WELCOME SCREEN
     st.markdown("---")
-    st.subheader(f"👋 Welcome to your terminal, Squaddyy!")
+    st.subheader(f"👋 Welcome to your terminal!")
     st.write("Ready to analyze the markets? Select an instrument from the sidebar and hit **Execute Analysis**.")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.info("💡 **Pro-Tip**: You can use the search box in the sidebar to look up any ticker symbol from Yahoo Finance.")
+        st.info("💡 **Pro-Tip**: Use the search box in the sidebar to look up any ticker symbol from Yahoo Finance.")
     with col2:
         st.success("🤖 **AI Status**: FinBERT Sentiment Engine is primed and ready.")
