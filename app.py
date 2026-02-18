@@ -6,29 +6,46 @@ import plotly.express as px
 from transformers import pipeline
 import time
 
-# 1. Page Configuration
+# 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# --- Session State Management ---
+# --- Persistent Session State ---
 if 'favorites' not in st.session_state: st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
 
-# --- Callback for Favorites ---
+# --- Callback to Handle Favorite Clicks ---
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Custom CSS (Restored Full Styling) ---
+# --- Premium Terminal CSS (Full Restoration) ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    [data-testid="stSidebar"] { background-image: linear-gradient(#1e293b, #0f172a); color: white; }
+    .stMetric { 
+        background-color: #ffffff; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    }
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(#1e293b, #0f172a);
+        color: white;
+    }
     [data-testid="stSidebar"] input { color: #1e293b !important; }
     div[data-baseweb="select"] * { color: #1e293b !important; }
     [data-testid="stSidebar"] label { color: white !important; font-weight: 600; }
-    div.stButton > button:first-child { background-color: #ffffff; color: #0f172a; border-radius: 8px; font-weight: bold; width: 100%; }
+    
+    div.stButton > button:first-child {
+        background-color: #ffffff;
+        color: #0f172a;
+        border-radius: 8px;
+        font-weight: bold;
+        border: none;
+        height: 3em;
+        width: 100%;
+    }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -41,8 +58,9 @@ st.caption("One dashboard for all your finance things")
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
-# STRICTLY CACHED: Only expires after 1 hour to prevent locks
-@st.cache_data(ttl=3600) 
+# Separate function for Fundamentals (The "Heavy" Call)
+# TTL set to 1 hour to prevent constant hitting of the rate limit
+@st.cache_data(ttl=3600)
 def get_fundamental_info(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -50,7 +68,7 @@ def get_fundamental_info(ticker):
     except:
         return None
 
-# LIGHTWEIGHT FETCH: Never gets blocked
+# Separate function for Price (The "Light" Call - rarely blocked)
 def get_price_history(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -61,7 +79,7 @@ def get_price_history(ticker):
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
-# --- Data Lists ---
+# --- Master Ticker Lists ---
 INDICES = {"Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"}
 STOCKS = {
     "Adani Ent": "ADANIENT.NS", "Asian Paints": "ASIANPAINT.NS", "Axis Bank": "AXISBANK.NS",
@@ -75,7 +93,7 @@ STOCKS = {
     "Vedanta": "VEDL.NS", "Wipro": "WIPRO.NS", "Zomato": "ZOMATO.NS"
 }
 
-# --- Sidebar ---
+# --- Sidebar Controls ---
 with st.sidebar:
     st.header("🎛️ Terminal Controls")
     asset_class = st.selectbox("Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
@@ -101,22 +119,22 @@ with st.sidebar:
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
     analyze_btn = st.button("Execute Analysis ⚡")
     
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
 
-# --- Main Logic ---
+# --- Main Dashboard Logic ---
 if analyze_btn or st.session_state.run_analysis:
     st.session_state.run_analysis = False
     
-    # 1. FETCH PRICE FIRST (This rarely fails)
+    # 1. FETCH PRICE FIRST (Lightweight, almost never fails)
     history = get_price_history(final_ticker)
     
     if not history.empty:
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
-        
-        # TAB 1: PRICE (Safe Zone)
+
+        # --- TAB 1: PRICE ACTION ---
         with tabs[0]:
             current = history['Close'].iloc[-1]
             prev_close = history['Close'].iloc[-2]
@@ -126,61 +144,86 @@ if analyze_btn or st.session_state.run_analysis:
             st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
             st.caption("*Note: Data may have a 15-min delay.*")
             
+            # Rich Candlestick Chart
             fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
             fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-        # TAB 2: SENTIMENT (Safe Zone - uses .news not .info)
+        # --- TAB 2: SENTIMENT ANALYSIS (Rich UI Restored) ---
         with tabs[1]:
             try:
-                stock = yf.Ticker(final_ticker)
-                news = stock.news
+                # We fetch news independently of fundamentals to avoid blocks
+                stock_obj = yf.Ticker(final_ticker)
+                news = stock_obj.news
+                
                 if news:
                     results = []
-                    for art in news[:num_articles]:
+                    prog = st.progress(0)
+                    articles_to_process = news[:num_articles]
+                    
+                    for i, art in enumerate(articles_to_process):
+                        prog.progress((i+1)/len(articles_to_process))
                         story = art.get('content', {})
                         if story.get('summary'):
                             res = pipe(story['summary'])[0]
-                            results.append({"title": story['title'], "label": res['label']})
+                            results.append({"title": story['title'], "label": res['label'], "score": res['score']})
+                    prog.empty()
+                    
                     if results:
-                        c1, c2 = st.columns(2)
                         pos = sum(1 for r in results if r['label'] == 'positive')
                         neg = sum(1 for r in results if r['label'] == 'negative')
-                        c1.metric("Sentiment", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                        
+                        # The RICH 3-Column UI
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Positive", pos)
+                        c2.metric("Negative", neg, delta_color="inverse")
+                        c3.metric("Market Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                        
                         st.divider()
-                        for r in results: st.write(f"- {r['title']}")
+                        # Detailed Expanders
+                        for r in results:
+                            emoji = "🟢" if r['label'] == 'positive' else "🔴" if r['label'] == 'negative' else "⚪"
+                            with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
+                                st.write(f"**AI Confidence Score:** {r['score']:.2f}")
                 else:
-                    st.info("No recent news found for AI analysis.")
-            except:
+                    st.info("No recent news found for analysis.")
+            except Exception as e:
                 st.warning("News feed temporarily unavailable.")
 
-        # TAB 3: FUNDAMENTALS (Danger Zone - Handled Gracefully)
+        # --- TAB 3: FUNDAMENTALS (Protected "Heavy" Call) ---
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
-            # We try to get cached info. If it fails, we don't crash the app.
+            
+            # Try to get cached info. If blocked, it returns None.
             info = get_fundamental_info(final_ticker)
             
             if info and len(info) > 10:
+                # Full Rich UI
                 k1, k2, k3 = st.columns(3)
                 k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
-                k2.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
-                k3.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
+                k1.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
+                k2.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
+                k2.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,}")
+                k3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
+                k3.metric("Avg Volume", f"{info.get('averageVolume', 0):,}")
                 
                 st.divider()
+                st.subheader("🏦 Ownership & Peers")
                 p1, p2 = st.columns(2)
                 with p1:
                     inst = info.get('heldPercentInstitutions', 0) * 100
                     insider = info.get('heldPercentInsiders', 0) * 100
                     fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
-                    fig_own.update_layout(title="Ownership Pattern")
+                    fig_own.update_layout(title="Shareholding Pattern")
                     st.plotly_chart(fig_own, use_container_width=True)
                 with p2:
                     st.write(f"**Sector:** {info.get('sector', 'N/A')}")
                     st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                    st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
             else:
-                # If blocked, we show a clean message but KEEP the rest of the app running
-                st.warning("⚠️ Fundamentals are temporarily rate-limited by Yahoo. Price & Charts are still live.")
-                st.caption("Try again in 15 minutes or check a different stock.")
+                # Graceful Failure: Shows warning ONLY in this tab
+                st.warning("⚠️ Fundamentals are temporarily rate-limited. Price & Sentiment remain live.")
+                st.caption("This usually resets in 15-30 minutes. The rest of the app is fully functional.")
                 if st.button("Force Retry 🔄"):
                     st.cache_data.clear()
                     st.rerun()
@@ -188,7 +231,7 @@ if analyze_btn or st.session_state.run_analysis:
         st.error(f"Could not fetch data for {final_ticker}. Please check the ticker symbol.")
 
 else:
-    # --- Welcome Screen ---
+    # --- WELCOME SCREEN (Heatmap & Favorites) ---
     st.subheader(f"👋 Welcome to your terminal!")
     col_fav, col_heat = st.columns([1, 2])
     
@@ -197,11 +240,12 @@ else:
         if st.session_state.favorites:
             for fav in st.session_state.favorites:
                 st.button(f"🔍 Analyze {fav}", key=f"fav_{fav}", on_click=select_favorite, args=(fav,))
-        else: st.write("Add favorites in the sidebar!")
+        else:
+            st.write("Add favorites in the sidebar!")
 
     with col_heat:
-        st.markdown("### 🗺️ Live Market Map")
-        # Optimized Sector Map
+        st.markdown("### 🗺️ Live Market Map (Drill-down Enabled)")
+        # Optimized Sector Map logic
         sector_map = {
             "Nifty Bank": ["HDFCBANK.NS", "SBIN.NS", "ICICIBANK.NS"],
             "Nifty IT": ["TCS.NS", "INFY.NS", "HCLTECH.NS"],
@@ -211,10 +255,10 @@ else:
         heat_results = []
         for sector, stocks in sector_map.items():
             try:
-                # We do NOT use .info here to avoid triggering the block
+                # We use get_price_history here because it's safer than .info
                 heat_results.append({"Label": sector, "Parent": "Market", "Performance": 0, "Size": 0})
                 for s in stocks:
-                    s_data = get_price_history(s) # Using the safe function
+                    s_data = get_price_history(s)
                     if not s_data.empty:
                         change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
                         heat_results.append({"Label": s.replace(".NS", ""), "Parent": sector, "Performance": change, "Size": abs(change) + 0.1})
