@@ -7,7 +7,7 @@ from transformers import pipeline
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# CUSTOM CSS: Fixed text visibility and Terminal design
+# CUSTOM CSS: Premium Terminal aesthetic and text visibility
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -180,7 +180,6 @@ if analyze_btn:
                     st.subheader("🏦 Ownership & Peers")
                     p1, p2 = st.columns(2)
                     with p1:
-                        # Ownership data
                         inst_own = info.get('heldPercentInstitutions', 0) * 100
                         insider_own = info.get('heldPercentInsiders', 0) * 100
                         fig_own = go.Figure(data=[go.Pie(labels=['Institutions', 'Insiders', 'Retail/Other'], 
@@ -189,7 +188,6 @@ if analyze_btn:
                         fig_own.update_layout(title="Shareholding Pattern")
                         st.plotly_chart(fig_own, use_container_width=True)
                     with p2:
-                        # Simple Peer Comparison
                         st.write(f"**Sector:** {info.get('sector', 'N/A')}")
                         st.write(f"**Industry:** {info.get('industry', 'N/A')}")
                         st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
@@ -201,7 +199,7 @@ if analyze_btn:
     except Exception as e:
         st.error(f"Analysis Error: {e}")
 else:
-    # THE GENERIC WELCOME SCREEN
+    # GENERIC WELCOME SCREEN
     st.markdown("---")
     st.subheader(f"👋 Welcome to your terminal!")
     st.write("Ready to analyze the markets? Select an instrument from the sidebar and hit **Execute Analysis**.")
