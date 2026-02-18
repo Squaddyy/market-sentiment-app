@@ -1,22 +1,30 @@
-# Market Sentiment Dashboard 📈
+# 📈 Market Analyzer Pro
 
-A real-time financial dashboard that uses NLP (FinBERT) to analyze news sentiment for Indian stocks. Built to solve the problem of manually reading dozens of news articles to gauge market mood.
+**One dashboard for all your finance things.** *Built by [Your Name/Squaddyy] - Your neighborhood programmer*
 
-## 🚀 Live Demo
-[Link to your streamlit app will go here]
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://squadystock.streamlit.app/)
+
+![Market Analyzer Pro Demo](demo.png)
+
+## 🚀 Overview
+Market Analyzer Pro is a sophisticated financial terminal built with Python. It bridges the gap between raw market data and actionable insights by combining real-time stock tracking, technical analysis, and AI-powered news sentiment into a single, "Anti-Fragile" interface.
+
+## ✨ Key Features
+* **Live Market Map:** An interactive Treemap visualizing Nifty sector performance with drill-down capabilities.
+* **Hybrid Data Engine:** Smart-switching between "Pro" (Rich Data) and "Lite" (API-Safe) modes to prevent crashes during high traffic.
+* **AI Sentiment Analysis:** Uses `ProsusAI/finbert` to analyze news headlines and generate a Bullish/Bearish confidence score.
+* **Technical Suite:** Real-time Candlestick charts with Open, High, Low, and Close metrics.
+* **Fundamental Profile:** detailed breakdown of Market Cap, P/E Ratios, Ownership patterns, and Peer comparison.
+* **Watchlist System:** Persistent "Favorites" list to track your top picks across sessions.
 
 ## 🛠️ Tech Stack
-- **Python** (Core logic)
-- **Streamlit** (Frontend UI)
-- **Hugging Face Transformers** (FinBERT model for sentiment analysis)
-- **yFinance** (Market data & news fetching)
+* **Frontend:** Streamlit (Custom CSS for "Dark Mode" terminal aesthetic)
+* **Data:** yFinance (Real-time NSE/BSE data)
+* **Visualization:** Plotly Express & Graph Objects
+* **AI/ML:** HuggingFace Transformers (BERT)
 
-## ⚡ Features
-- **Live Sentiment Analysis:** Scrapes recent news and classifies it as Positive/Negative/Neutral.
-- **Dynamic Stock Search:** Supports all NSE tickers (e.g., `ZOMATO.NS`, `RELIANCE.NS`).
-- **Data Visualization:** Interactive price charts and sentiment distribution metrics.
+## 📦 Installation
 
-## 📦 Local Setup
-1. Clone the repo:
+1. Clone the repository:
    ```bash
-   git clone [https://github.com/Squaddyy/market-sentiment-app.git](https://github.com/Squaddyy/market-sentiment-app.git)
+   git clone [https://github.com/Squaddyy/market-analyzer-pro.git](https://github.com/Squaddyy/market-analyzer-pro.git)
