@@ -8,16 +8,17 @@ from transformers import pipeline
 # 1. Page Configuration
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# --- Persistent Session State ---
+# --- Session State ---
 if 'favorites' not in st.session_state: st.session_state.favorites = []
-if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
 
+# --- THE FIX: Force Update the Sidebar Input Key ---
 def select_favorite(ticker):
-    st.session_state.manual_ticker = ticker
+    # This updates the text input widget's state directly
+    st.session_state.manual_ticker_input = ticker
     st.session_state.run_analysis = True
 
-# --- Currency Formatter (The Fix for Ugly Lite Mode Numbers) ---
+# --- Currency Formatter ---
 def format_currency(value):
     if not isinstance(value, (int, float)): return value
     if value >= 1e12: return f"₹{value/1e12:.2f}T"
@@ -26,7 +27,7 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: THE "LASER-GUIDED" VISIBILITY FIX ---
+# --- CSS: LASER-GUIDED VISIBILITY & LAYOUT ---
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -42,23 +43,41 @@ st.markdown("""
         border-right: 1px solid #334155;
     }
 
-    /* 3. SIDEBAR LABELS (Keep these White) */
+    /* 3. SIDEBAR TEXT: Force Bright White */
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] .stMarkdown p {
-        color: #f8fafc !important;
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
     }
 
-    /* 4. SIDEBAR BUTTONS (The Fix: Force Dark Text) */
+    /* 4. INPUT BOXES: White Box, Dark Text (FIXED) */
+    [data-testid="stSidebar"] input {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+    }
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #0f172a !important; 
+    }
+    /* Fix the popup list items */
+    ul[data-testid="stSelectboxVirtualDropdown"] li span {
+        color: #0f172a !important;
+    }
+
+    /* 5. SIDEBAR BUTTONS: Force Dark Text so it's visible */
     [data-testid="stSidebar"] .stButton > button {
         background-color: #ffffff !important;
-        color: #0f172a !important; /* Dark Blue Text */
+        color: #0f172a !important;
         border: 1px solid #cbd5e1 !important;
         font-weight: bold;
     }
-    /* CRITICAL: Force the text inside the button to be Dark Blue */
+    /* Force internal paragraph text to be dark too */
     [data-testid="stSidebar"] .stButton > button p {
         color: #0f172a !important; 
     }
@@ -69,27 +88,8 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton > button:hover p {
         color: #3b82f6 !important;
     }
-
-    /* 5. SIDEBAR INPUTS (The Fix: Dark Text in White Box) */
-    [data-testid="stSidebar"] input {
-        color: #0f172a !important;
-        background-color: #ffffff !important;
-    }
     
-    /* 6. DROPDOWNS (Fix Text Visibility) */
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #0f172a !important;
-    }
-    /* Fix the popup list items */
-    ul[data-testid="stSelectboxVirtualDropdown"] li span {
-        color: #0f172a !important;
-    }
-    
-    /* 7. METRIC CARDS */
+    /* 6. Metric Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -110,12 +110,12 @@ st.caption("One dashboard for all your finance things")
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
-# --- HYBRID DATA ENGINE (The Fix for API Blocks) ---
+# --- HYBRID DATA ENGINE (Pro + Lite Mode) ---
 @st.cache_data(ttl=3600)
 def get_fundamental_info(ticker):
     stock = yf.Ticker(ticker)
     
-    # Strategy 1: Rich Data (Pro Mode) - Tries the front door
+    # Strategy 1: Rich Data (Pro Mode)
     try:
         info = stock.info
         if info and len(info) > 5:
@@ -134,16 +134,15 @@ def get_fundamental_info(ticker):
             }
     except: pass
     
-    # Strategy 2: Lite Data (Safe Mode) - Sneaks in the back door
-    # This runs if Strategy 1 fails (Rate Limit)
+    # Strategy 2: Lite Data (Safe Mode)
     try:
         fast = stock.fast_info
         return {
             "status": "Lite",
-            "mcap": format_currency(fast.market_cap), # Clean Format
+            "mcap": format_currency(fast.market_cap),
             "pe": "N/A (Lite)",
-            "high": format_currency(fast.year_high),  # Clean Format
-            "low": format_currency(fast.year_low),    # Clean Format
+            "high": format_currency(fast.year_high),
+            "low": format_currency(fast.year_low),
             "div": "N/A",
             "vol": format_currency(fast.last_volume),
             "sector": "Basic Data Mode",
@@ -183,6 +182,7 @@ with st.sidebar:
     current_list = INDICES if asset_class == "Indices (Market View)" else STOCKS
     dropdown_name = st.selectbox("Choose from list:", sorted(list(current_list.keys())))
     
+    # THE KEY IS "manual_ticker_input" - This MUST match the session state update
     ticker_input = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", key="manual_ticker_input")
     final_ticker = ticker_input.upper() if ticker_input else current_list[dropdown_name]
     
@@ -241,7 +241,6 @@ if analyze_btn or st.session_state.run_analysis:
                     results = []
                     prog = st.progress(0)
                     articles_to_process = news[:num_articles]
-                    
                     for i, art in enumerate(articles_to_process):
                         prog.progress((i+1)/len(articles_to_process))
                         story = art.get('content', {})
@@ -253,26 +252,24 @@ if analyze_btn or st.session_state.run_analysis:
                     if results:
                         pos = sum(1 for r in results if r['label'] == 'positive')
                         neg = sum(1 for r in results if r['label'] == 'negative')
-                        
                         c1, c2, c3 = st.columns(3)
                         c1.metric("Positive", pos)
                         c2.metric("Negative", neg, delta_color="inverse")
                         c3.metric("Market Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
-                        
                         st.divider()
                         for r in results:
                             emoji = "🟢" if r['label'] == 'positive' else "🔴" if r['label'] == 'negative' else "⚪"
                             with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
                                 st.write(f"**AI Confidence Score:** {r['score']:.2f}")
-                else: st.info("No recent news found for analysis.")
-            except: st.warning("News feed temporarily unavailable.")
+                else: st.info("No recent news found.")
+            except: st.warning("News unavailable.")
 
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
             data = get_fundamental_info(final_ticker)
             
             if data:
-                # Optional: Show a tiny badge if in Lite Mode so you know why P/E is missing
+                # Status Badge
                 if data['status'] == "Lite":
                     st.caption("⚠️ API Rate Limit Active: Showing Real-Time Lite Data")
 
