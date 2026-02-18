@@ -4,27 +4,66 @@ import pandas as pd
 import plotly.graph_objects as go
 from transformers import pipeline
 
-# 1. Page Configuration & Custom CSS for Design
+# 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# Custom CSS for the "Premium Terminal" aesthetic
+# CUSTOM CSS: Fixed text visibility for Dark Sidebar
 st.markdown("""
     <style>
+    /* Main Page Background */
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    footer {visibility: hidden;}
-    /* Sidebar Styling */
+    
+    /* Metric Card Styling */
+    .stMetric { 
+        background-color: #ffffff; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    }
+    
+    /* SIDEBAR DARK THEME */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         color: white;
     }
-    [data-testid="stSidebar"] * {
-        color: white !important;
+    
+    /* FIX: Force Input Text to be Dark/Visible */
+    [data-testid="stSidebar"] input {
+        color: #1e293b !important;
     }
+    
+    /* FIX: Force Dropdown Text to be Dark/Visible */
+    div[data-baseweb="select"] * {
+        color: #1e293b !important;
+    }
+    
+    /* Sidebar Labels (White for contrast against dark blue) */
+    [data-testid="stSidebar"] label {
+        color: white !important;
+        font-weight: 600;
+    }
+
+    /* Execute Analysis Button Styling */
+    div.stButton > button:first-child {
+        background-color: #ffffff;
+        color: #0f172a;
+        border-radius: 8px;
+        font-weight: bold;
+        border: none;
+        height: 3em;
+        width: 100%;
+    }
+    
+    div.stButton > button:hover {
+        background-color: #e2e8f0;
+        color: #0f172a;
+    }
+
+    footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# THE OFFICIAL NAME
+# DASHBOARD HEADER
 st.title("📈 Market Analyzer Pro")
 st.caption("Strategic AI-Powered Sentiment & Market Analysis")
 
@@ -36,7 +75,7 @@ def load_model():
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
-# --- THE MEGA LIST (Expanded & Alphabetically Sorted) ---
+# --- THE MEGA LIST (Expanded & Sorted) ---
 INDICES = {
     "Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"
 }
@@ -54,31 +93,42 @@ STOCKS = {
     "Apple (US Demo)": "AAPL", "Tesla (US Demo)": "TSLA"
 }
 
-# --- SIDEBAR: MASTER CONTROLS ---
+# --- SIDEBAR: TERMINAL CONTROLS ---
 with st.sidebar:
     st.header("🎛️ Terminal Controls")
-    asset_class = st.selectbox("1. Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
+    
+    # 1. Asset Class Selection
+    asset_class = st.selectbox("Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
     
     st.divider()
-    st.subheader("2. Select Instrument")
     
-    # Dynamic List Selection based on category
+    # 2. Dynamic Instrument Selection
+    st.subheader("Select Instrument")
     current_list = INDICES if asset_class == "Indices (Market View)" else STOCKS
     sorted_keys = sorted(list(current_list.keys()))
+    
     dropdown_name = st.selectbox("Choose from list:", sorted_keys)
     dropdown_ticker = current_list[dropdown_name]
     
-    # Text input override
+    # 3. Manual Ticker Override
     manual_ticker = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", "")
     ticker = manual_ticker.upper() if manual_ticker else dropdown_ticker
     
-    st.info(f"Targeting: **{ticker}**")
+    # Visual Confirmation of Target
+    st.markdown(f"""
+        <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 5px solid #60a5fa;">
+            <span style="font-size: 0.8em; color: #94a3b8;">Targeting:</span><br>
+            <strong style="color: white; font-size: 1.1em;">{ticker}</strong>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
     
-    analyze_btn = st.button("Execute Analysis ⚡", use_container_width=True)
+    analyze_btn = st.button("Execute Analysis ⚡")
     
-    # THE NEIGHBORHOOD SIGNATURE
-    st.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
+    # THE SIGNATURE
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
@@ -89,7 +139,7 @@ if analyze_btn:
         stock = yf.Ticker(ticker)
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals"])
 
-        # TAB 1: PRICE ACTION (Detailed Metrics Restored)
+        # TAB 1: PRICE ACTION
         with tabs[0]:
             history = stock.history(period="6mo")
             if not history.empty:
@@ -119,7 +169,7 @@ if analyze_btn:
                 fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
 
-        # TAB 2: SENTIMENT ANALYSIS
+        # TAB 2: SENTIMENT
         with tabs[1]:
             news = stock.news
             if news:
@@ -164,7 +214,7 @@ if analyze_btn:
                 else:
                     st.warning("Key stats currently on cooldown due to API limits.")
             except:
-                st.error("Fundamental data temporarily unavailable.")
+                st.error("Fundamental data unavailable.")
 
     except Exception as e:
         st.error(f"Analysis Error: {e}")
