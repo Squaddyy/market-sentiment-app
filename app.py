@@ -7,43 +7,24 @@ from transformers import pipeline
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# CUSTOM CSS: Fixed text visibility for Dark Sidebar
+# CUSTOM CSS: Fixed text visibility and Terminal design
 st.markdown("""
     <style>
-    /* Main Page Background */
     .main { background-color: #f8f9fa; }
-    
-    /* Metric Card Styling */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
         border-radius: 10px; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
     }
-    
-    /* SIDEBAR DARK THEME */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         color: white;
     }
-    
-    /* FIX: Force Input Text to be Dark/Visible */
-    [data-testid="stSidebar"] input {
-        color: #1e293b !important;
-    }
-    
-    /* FIX: Force Dropdown Text to be Dark/Visible */
-    div[data-baseweb="select"] * {
-        color: #1e293b !important;
-    }
-    
-    /* Sidebar Labels (White for contrast against dark blue) */
-    [data-testid="stSidebar"] label {
-        color: white !important;
-        font-weight: 600;
-    }
+    [data-testid="stSidebar"] input { color: #1e293b !important; }
+    div[data-baseweb="select"] * { color: #1e293b !important; }
+    [data-testid="stSidebar"] label { color: white !important; font-weight: 600; }
 
-    /* Execute Analysis Button Styling */
     div.stButton > button:first-child {
         background-color: #ffffff;
         color: #0f172a;
@@ -53,19 +34,13 @@ st.markdown("""
         height: 3em;
         width: 100%;
     }
-    
-    div.stButton > button:hover {
-        background-color: #e2e8f0;
-        color: #0f172a;
-    }
-
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
 # DASHBOARD HEADER
 st.title("📈 Market Analyzer Pro")
-st.caption("Strategic AI-Powered Sentiment & Market Analysis")
+st.caption("One dashboard for all your finance things")
 
 # --- Load AI Model (Cached) ---
 @st.cache_resource
@@ -75,7 +50,7 @@ def load_model():
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
-# --- THE MEGA LIST (Expanded & Sorted) ---
+# --- THE MEGA LIST ---
 INDICES = {
     "Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"
 }
@@ -96,25 +71,18 @@ STOCKS = {
 # --- SIDEBAR: TERMINAL CONTROLS ---
 with st.sidebar:
     st.header("🎛️ Terminal Controls")
-    
-    # 1. Asset Class Selection
     asset_class = st.selectbox("Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
-    
     st.divider()
     
-    # 2. Dynamic Instrument Selection
     st.subheader("Select Instrument")
     current_list = INDICES if asset_class == "Indices (Market View)" else STOCKS
     sorted_keys = sorted(list(current_list.keys()))
-    
     dropdown_name = st.selectbox("Choose from list:", sorted_keys)
     dropdown_ticker = current_list[dropdown_name]
     
-    # 3. Manual Ticker Override
     manual_ticker = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", "")
     ticker = manual_ticker.upper() if manual_ticker else dropdown_ticker
     
-    # Visual Confirmation of Target
     st.markdown(f"""
         <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 5px solid #60a5fa;">
             <span style="font-size: 0.8em; color: #94a3b8;">Targeting:</span><br>
@@ -124,10 +92,8 @@ with st.sidebar:
     
     st.write("")
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
-    
     analyze_btn = st.button("Execute Analysis ⚡")
     
-    # THE SIGNATURE
     st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("### 🛠️ Built by **Squaddyy**")
@@ -139,7 +105,6 @@ if analyze_btn:
         stock = yf.Ticker(ticker)
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals"])
 
-        # TAB 1: PRICE ACTION
         with tabs[0]:
             history = stock.history(period="6mo")
             if not history.empty:
@@ -155,6 +120,8 @@ if analyze_btn:
                 pct_change = (change / prev_close) * 100
 
                 st.metric(label=f"{ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
+                # THE DATA DISCLAIMER -
+                st.caption("*Note: Data may have a 15-min delay (Standard for free APIs).*")
                 
                 t1, t2, t3, t4 = st.columns(4)
                 try:
@@ -169,7 +136,6 @@ if analyze_btn:
                 fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
 
-        # TAB 2: SENTIMENT
         with tabs[1]:
             news = stock.news
             if news:
@@ -198,7 +164,6 @@ if analyze_btn:
                         with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
                             st.write(f"AI Confidence: {r['score']:.2f}")
 
-        # TAB 3: KEY STATS
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
             try:
@@ -218,3 +183,14 @@ if analyze_btn:
 
     except Exception as e:
         st.error(f"Analysis Error: {e}")
+else:
+    # THE WELCOME SCREEN
+    st.markdown("---")
+    st.subheader(f"👋 Welcome to your terminal, Squaddyy!")
+    st.write("Ready to analyze the markets? Select an instrument from the sidebar and hit **Execute Analysis**.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("💡 **Pro-Tip**: You can use the search box in the sidebar to look up any ticker symbol from Yahoo Finance.")
+    with col2:
+        st.success("🤖 **AI Status**: FinBERT Sentiment Engine is primed and ready.")
