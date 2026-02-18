@@ -2,10 +2,15 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 from transformers import pipeline
 
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
+
+# Initialize Favorites in Session State if not exists
+if 'favorites' not in st.session_state:
+    st.session_state.favorites = []
 
 # CUSTOM CSS: Premium Terminal aesthetic and text visibility
 st.markdown("""
@@ -90,11 +95,20 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
+    # FAVORITES TOGGLE
+    if st.button("⭐ Add/Remove Favorite"):
+        if ticker in st.session_state.favorites:
+            st.session_state.favorites.remove(ticker)
+            st.toast(f"Removed {ticker} from favorites")
+        else:
+            st.session_state.favorites.append(ticker)
+            st.toast(f"Added {ticker} to favorites")
+
     st.write("")
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
     analyze_btn = st.button("Execute Analysis ⚡")
     
-    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
@@ -199,13 +213,30 @@ if analyze_btn:
     except Exception as e:
         st.error(f"Analysis Error: {e}")
 else:
-    # GENERIC WELCOME SCREEN
-    st.markdown("---")
+    # --- UPDATED WELCOME SCREEN WITH HEATMAP & FAVORITES ---
     st.subheader(f"👋 Welcome to your terminal!")
-    st.write("Ready to analyze the markets? Select an instrument from the sidebar and hit **Execute Analysis**.")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info("💡 **Pro-Tip**: Use the search box in the sidebar to look up any ticker symbol from Yahoo Finance.")
-    with col2:
-        st.success("🤖 **AI Status**: FinBERT Sentiment Engine is primed and ready.")
+    col_fav, col_heat = st.columns([1, 2])
+    
+    with col_fav:
+        st.markdown("### ⭐ Your Favorites")
+        if st.session_state.favorites:
+            for fav in st.session_state.favorites:
+                st.button(f"🔍 Analyze {fav}", key=fav, on_click=lambda f=fav: st.write(f"Selected {f} (Hit Analysis button below)"))
+        else:
+            st.write("No favorites yet. Add some in the sidebar!")
+
+    with col_heat:
+        st.markdown("### 🗺️ Sector Heatmap (Sample)")
+        # Sample Heatmap Data
+        heatmap_data = pd.DataFrame({
+            "Sector": ["Banking", "IT", "Energy", "Consumer", "Auto", "Pharma"],
+            "Performance": [1.2, -0.8, 2.5, 0.4, -1.5, 0.9],
+            "Parent": ["Market", "Market", "Market", "Market", "Market", "Market"]
+        })
+        fig_heat = px.treemap(heatmap_data, path=['Parent', 'Sector'], values=[1,1,1,1,1,1],
+                             color='Performance', color_continuous_scale='RdYlGn',
+                             range_color=[-3, 3])
+        st.plotly_chart(fig_heat, use_container_width=True)
+
+    st.info("Ready to analyze? Select an instrument from the sidebar and hit **Execute Analysis**.")
