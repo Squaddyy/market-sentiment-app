@@ -8,7 +8,7 @@ from transformers import pipeline
 # 1. Page Configuration
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# --- Session State ---
+# --- Persistent Session State ---
 if 'favorites' not in st.session_state: st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
@@ -17,7 +17,7 @@ def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Formatter ---
+# --- Currency Formatter ---
 def format_currency(value):
     if not isinstance(value, (int, float)): return value
     if value >= 1e12: return f"₹{value/1e12:.2f}T"
@@ -26,7 +26,7 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CSS: THE "LASER-GUIDED" VISIBILITY FIX ---
+# --- CUSTOM CSS: THE "NUCLEAR" VISIBILITY FIX ---
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -36,60 +36,59 @@ st.markdown("""
         background-size: 30px 30px;
     }
     
-    /* 2. Sidebar Container */
+    /* 2. Sidebar Container - Dark Blue Gradient */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         border-right: 1px solid #334155;
     }
 
-    /* 3. SIDEBAR LABELS (Keep these White) */
+    /* 3. SIDEBAR TEXT: Force Bright White */
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] .stMarkdown p {
-        color: #f8fafc !important;
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
     }
 
-    /* 4. SIDEBAR BUTTONS (The Fix: Force Dark Text) */
-    [data-testid="stSidebar"] .stButton > button {
-        background-color: #ffffff !important;
-        color: #0f172a !important; /* Dark Blue Text */
-        border: 1px solid #cbd5e1 !important;
-        font-weight: bold;
-    }
-    /* CRITICAL: Force the text inside the button (<p> tag) to be Dark Blue */
-    [data-testid="stSidebar"] .stButton > button p {
-        color: #0f172a !important; 
-    }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        border-color: #3b82f6 !important;
-        color: #3b82f6 !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover p {
-        color: #3b82f6 !important;
-    }
-
-    /* 5. SIDEBAR INPUTS (The Fix: Dark Text in White Box) */
+    /* 4. INPUT BOXES: White Box, Dark Text */
     [data-testid="stSidebar"] input {
         color: #0f172a !important;
         background-color: #ffffff !important;
     }
-    
-    /* 6. DROPDOWNS (Fix Text Visibility) */
+    /* Fix Dropdown Menu */
     div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
     }
     div[data-baseweb="select"] span {
-        color: #0f172a !important;
+        color: #0f172a !important; 
     }
-    /* Fix the popup list items */
+    /* Fix the text inside the dropdown list when clicked */
     ul[data-testid="stSelectboxVirtualDropdown"] li span {
         color: #0f172a !important;
     }
+
+    /* 5. BUTTON STYLING (The Fix for Favorites) */
+    /* Forces button text to be Dark Blue so it's visible on White button */
+    div.stButton > button {
+        background-color: #ffffff !important;
+        color: #0f172a !important; /* This makes the text visible */
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
     
-    /* 7. METRIC CARDS */
+    /* 6. Metric Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
