@@ -17,17 +17,17 @@ def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- CUSTOM CSS: The "Financial Grid" Look ---
+# --- CUSTOM CSS: The "Cool Slate" Tech Look ---
 st.markdown("""
     <style>
-    /* 1. Main Background: Subtle Technical Dot Grid */
+    /* 1. Main Background: Cool Slate with Subtle Grid */
     .main {
-        background-color: #f8f9fa;
+        background-color: #f1f5f9; /* Slightly darker than white for contrast */
         background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-        background-size: 30px 30px; /* Distance between dots */
+        background-size: 30px 30px;
     }
     
-    /* 2. Cards: Clean White with Shadow */
+    /* 2. Cards: crisp white, floating effect */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -43,7 +43,7 @@ st.markdown("""
         border-right: 1px solid #334155;
     }
     
-    /* 4. Input Visibility Fixes */
+    /* 4. Input & Text Fixes */
     [data-testid="stSidebar"] input { color: #1e293b !important; }
     div[data-baseweb="select"] * { color: #1e293b !important; }
     [data-testid="stSidebar"] label { color: white !important; font-weight: 600; font-size: 0.9rem; }
@@ -167,6 +167,7 @@ if analyze_btn or st.session_state.run_analysis:
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
         with tabs[0]:
+            # Main Price Display
             current = history['Close'].iloc[-1]
             prev_close = history['Close'].iloc[-2]
             change = current - prev_close
@@ -175,6 +176,14 @@ if analyze_btn or st.session_state.run_analysis:
             st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
             st.caption("*Note: Data may have a 15-min delay.*")
             
+            # Restored Detailed Metrics
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Open", f"₹{history['Open'].iloc[-1]:,.2f}")
+            c2.metric("High", f"₹{history['High'].iloc[-1]:,.2f}")
+            c3.metric("Low", f"₹{history['Low'].iloc[-1]:,.2f}")
+            c4.metric("Prev. Close", f"₹{prev_close:,.2f}")
+
+            # Chart
             fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
             fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
