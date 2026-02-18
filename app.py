@@ -17,69 +17,26 @@ with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
 # --- DATA: The Master Lists ---
-INDICES = {
-    "Nifty 50": "^NSEI",
-    "Sensex": "^BSESN",
-    "Nifty Bank": "^NSEBANK",
-    "S&P 500 (US)": "^GSPC",
-    "Nasdaq 100 (US)": "^IXIC"
-}
-
 STOCKS = {
-    "Reliance Industries": "RELIANCE.NS",
-    "TATA Consultancy Services (TCS)": "TCS.NS",
-    "HDFC Bank": "HDFCBANK.NS",
-    "Infosys": "INFY.NS",
-    "ICICI Bank": "ICICIBANK.NS",
-    "State Bank of India (SBI)": "SBIN.NS",
-    "Bharti Airtel": "BHARTIARTL.NS",
-    "ITC Limited": "ITC.NS",
-    "Larsen & Toubro (L&T)": "LT.NS",
-    "Bajaj Finance": "BAJFINANCE.NS",
-    "Kotak Mahindra Bank": "KOTAKBANK.NS",
-    "Asian Paints": "ASIANPAINT.NS",
-    "Maruti Suzuki": "MARUTI.NS",
-    "HCL Technologies": "HCLTECH.NS",
-    "Sun Pharma": "SUNPHARMA.NS",
-    "Titan Company": "TITAN.NS",
-    "Mahindra & Mahindra": "M&M.NS",
-    "UltraTech Cement": "ULTRACEMCO.NS",
-    "Tata Motors": "TATAMOTORS.NS",
-    "NTPC": "NTPC.NS",
-    "Wipro": "WIPRO.NS",
-    "Tata Steel": "TATASTEEL.NS",
-    "Coal India": "COALINDIA.NS",
-    "Adani Enterprises": "ADANIENT.NS",
-    "Zomato": "ZOMATO.NS",
-    "Paytm (One97)": "PAYTM.NS",
-    "DLF": "DLF.NS",
-    "Varun Beverages": "VBL.NS",
-    "Jio Financial": "JIOFIN.NS",
-    "Suzlon Energy": "SUZLON.NS",
-    "Apple (US Demo)": "AAPL",
-    "Tesla (US Demo)": "TSLA",
-    "SPY ETF (US Demo)": "SPY"
+    "Reliance Industries": "RELIANCE.NS", "TCS.NS": "TCS.NS", "HDFC Bank": "HDFCBANK.NS",
+    "Infosys": "INFY.NS", "ICICI Bank": "ICICIBANK.NS", "Zomato": "ZOMATO.NS",
+    "Tata Motors": "TATAMOTORS.NS", "Paytm": "PAYTM.NS", "Apple (US Demo)": "AAPL"
 }
 
 # --- SIDEBAR: MASTER CONTROLS ---
 with st.sidebar:
     st.header("🎛️ Control Panel")
-    asset_class = st.selectbox("1. Select Asset Class:", 
-                               ["Indices (Market View)", "Equities (Stocks)", "Derivatives (Options)"])
+    asset_class = st.selectbox("1. Select Asset Class:", ["Equities (Stocks)", "Indices (Market View)", "Derivatives (Options)"])
     
     st.divider()
     
-    if asset_class == "Indices (Market View)":
-        selected_name = st.selectbox("Choose Index:", list(INDICES.keys()))
-        ticker = INDICES[selected_name]
-    elif asset_class == "Equities (Stocks)":
-        selected_name = st.selectbox("Search Stock:", list(STOCKS.keys()))
-        ticker = STOCKS[selected_name]
-    else: # Derivatives
-        st.warning("⚠️ Indian Options data may be delayed. Try 'US Demo' stocks for better live data.")
-        selected_name = st.selectbox("Select Stock for Options:", list(STOCKS.keys()))
-        ticker = STOCKS[selected_name]
-
+    # --- DUAL SEARCH SYSTEM ---
+    st.subheader("2. Select or Search")
+    dropdown_ticker = st.selectbox("Choose from list:", list(STOCKS.keys()))
+    manual_ticker = st.text_input("OR Type Any Ticker (e.g. VEDL.NS):", "")
+    
+    ticker = manual_ticker.upper() if manual_ticker else STOCKS[dropdown_ticker]
+    
     num_articles = st.slider("Analyze Depth (Articles):", 5, 50, 15)
     analyze_btn = st.button("Run Analysis 🚀")
 
@@ -88,80 +45,83 @@ if analyze_btn:
     try:
         stock = yf.Ticker(ticker)
         
-        if asset_class == "Derivatives (Options)":
-            tabs = st.tabs(["📉 Options Chain", "📊 Bull/Bear Ratio", "📋 Raw Data"])
-        else:
-            tabs = st.tabs(["📈 Price Action", "📰 AI Sentiment Analysis", "📋 Key Stats"])
+        # Tabs for better organization
+        tabs = st.tabs(["📈 Price Action", "📰 AI Sentiment Analysis", "📋 Key Stats"])
 
-        # TAB 1 & 2 for Indices/Equities
-        if asset_class != "Derivatives (Options)":
-            with tabs[0]:
-                history = stock.history(period="6mo")
-                if not history.empty:
-                    current = history['Close'].iloc[-1]
-                    change = current - history['Close'].iloc[-2]
-                    st.metric(label=f"{ticker} Price", value=f"₹{current:,.2f}", delta=f"{change:.2f}")
-                    fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
-                    st.plotly_chart(fig, use_container_width=True)
+        # --- TAB 1: PRICE ACTION (Restored Metrics) ---
+        with tabs[0]:
+            history = stock.history(period="6mo")
+            if not history.empty:
+                # Fetch Latest Detailed Prices
+                info = stock.info
+                current = info.get('currentPrice') or history['Close'].iloc[-1]
+                prev_close = info.get('previousClose') or history['Close'].iloc[-2]
+                change = current - prev_close
+                pct_change = (change / prev_close) * 100
 
-            with tabs[1]:
-                news = stock.news
-                if news:
-                    results = []
-                    prog = st.progress(0)
-                    for i, art in enumerate(news[:num_articles]):
-                        prog.progress((i+1)/len(news[:num_articles]))
-                        story = art.get('content', {})
-                        if story.get('summary'):
-                            res = pipe(story['summary'])[0]
-                            results.append({"title": story['title'], "label": res['label'], "score": res['score']})
-                    prog.empty()
-                    
-                    if results:
-                        pos = sum(1 for r in results if r['label'] == 'positive')
-                        neg = sum(1 for r in results if r['label'] == 'negative')
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Positive", pos)
-                        c2.metric("Negative", neg)
-                        c3.metric("Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
-                        for r in results:
-                            with st.expander(f"{r['label'].upper()}: {r['title']}"):
-                                st.write(f"Confidence: {r['score']:.2f}")
-            
-            # THE OPTIMIZED TAB 3
-            with tabs[2]:
-                st.subheader("📋 Key Fundamentals")
-                try:
-                    info = stock.info
-                    if info and len(info) > 5:
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
-                        c1.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
-                        c2.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
-                        c2.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,}")
-                        c3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
-                        with st.expander("View Full Raw Data (JSON)"):
-                            st.json(info)
-                    else:
-                        st.warning("⚠️ Rate limited for detailed stats. Price and News remain functional.")
-                except Exception:
-                    st.error("Rate limit reached for Fundamental Data.")
+                # Main Price Delta
+                st.metric(label=f"{ticker} Live Price", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
+                
+                # RE-ADDED: Technical Metrics Grid
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Open", f"₹{info.get('open', 'N/A'):,}")
+                m2.metric("Day High", f"₹{info.get('dayHigh', 'N/A'):,}")
+                m3.metric("Day Low", f"₹{info.get('dayLow', 'N/A'):,}")
+                m4.metric("Prev. Close", f"₹{prev_close:,.2f}")
 
-        # DERIVATIVES LOGIC
-        else:
-            expirations = stock.options
-            if expirations:
-                with tabs[0]:
-                    sel_expiry = st.selectbox("Expiry:", expirations)
-                    chain = stock.option_chain(sel_expiry)
-                    st.dataframe(chain.calls.head(10))
-                with tabs[1]:
-                    c_oi = chain.calls['openInterest'].sum()
-                    p_oi = chain.puts['openInterest'].sum()
-                    st.metric("Put-Call Ratio", f"{p_oi/c_oi:.2f}" if c_oi > 0 else "N/A")
-                    st.plotly_chart(go.Figure(data=[go.Pie(labels=['Calls', 'Puts'], values=[c_oi, p_oi])]))
+                # Candlestick Chart
+                fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
+                fig.update_layout(xaxis_rangeslider_visible=False, height=500)
+                st.plotly_chart(fig, use_container_width=True)
             else:
-                st.error("No Options Data available.")
+                st.warning("No price data available for this ticker.")
+
+        # --- TAB 2: SENTIMENT ANALYSIS ---
+        with tabs[1]:
+            news = stock.news
+            if news:
+                results = []
+                prog = st.progress(0)
+                for i, art in enumerate(news[:num_articles]):
+                    prog.progress((i+1)/len(news[:num_articles]))
+                    story = art.get('content', {})
+                    if story.get('summary'):
+                        res = pipe(story['summary'])[0]
+                        results.append({"title": story['title'], "label": res['label'], "score": res['score']})
+                prog.empty()
+                
+                if results:
+                    pos = sum(1 for r in results if r['label'] == 'positive')
+                    neg = sum(1 for r in results if r['label'] == 'negative')
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Positive Articles", pos)
+                    c2.metric("Negative Articles", neg)
+                    c3.metric("Overall Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                    for r in results:
+                        emoji = "🟢" if r['label'] == 'positive' else "🔴" if r['label'] == 'negative' else "⚪"
+                        with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
+                            st.write(f"Confidence Score: {r['score']:.2f}")
+
+        # --- TAB 3: KEY STATS (Final Resilience Fix) ---
+        with tabs[2]:
+            st.subheader("📋 Fundamental Data")
+            try:
+                # Optimized info retrieval
+                info = stock.info
+                if info and len(info) > 10:
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
+                    c1.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
+                    c2.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
+                    c2.metric("52W Low", f"₹{info.get('fiftyTwoWeekLow', 0):,}")
+                    c3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
+                    c3.metric("Avg Volume", f"{info.get('averageVolume', 0):,}")
+                    with st.expander("View Raw Data Details"):
+                        st.json(info)
+                else:
+                    st.warning("⚠️ Yahoo Finance is currently throttling detailed stats. Please wait 60 seconds.")
+            except:
+                st.error("Fundamental Data could not be loaded at this time.")
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error initializing analysis: {e}")
