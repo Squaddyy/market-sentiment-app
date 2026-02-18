@@ -12,38 +12,28 @@ st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="w
 if 'favorites' not in st.session_state: st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state: st.session_state.manual_ticker = ""
 if 'run_analysis' not in st.session_state: st.session_state.run_analysis = False
-if 'api_status' not in st.session_state: st.session_state.api_status = "Pro Mode"
 
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Helper: Currency Formatter (The Fix for Ugly Numbers) ---
+# --- Helper: Currency Formatter ---
 def format_currency(value):
-    if not isinstance(value, (int, float)):
-        return value
-    if value >= 1e12:
-        return f"₹{value/1e12:.2f}T"
-    elif value >= 1e9:
-        return f"₹{value/1e9:.2f}B"
-    elif value >= 1e7:
-        return f"₹{value/1e7:.2f}Cr"
-    elif value >= 1e5:
-        return f"₹{value/1e5:.2f}L"
-    else:
-        return f"₹{value:,.2f}"
+    if not isinstance(value, (int, float)): return value
+    if value >= 1e12: return f"₹{value/1e12:.2f}T"
+    elif value >= 1e9: return f"₹{value/1e9:.2f}B"
+    elif value >= 1e7: return f"₹{value/1e7:.2f}Cr"
+    elif value >= 1e5: return f"₹{value/1e5:.2f}L"
+    else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: Cool Slate Tech Look ---
+# --- CUSTOM CSS: Production Styling ---
 st.markdown("""
     <style>
-    /* 1. Main Background */
     .main {
         background-color: #f1f5f9;
         background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
         background-size: 30px 30px;
     }
-    
-    /* 2. Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -51,20 +41,14 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); 
         border: 1px solid #e2e8f0;
     }
-
-    /* 3. Sidebar */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         color: white;
         border-right: 1px solid #334155;
     }
-    
-    /* 4. Inputs */
     [data-testid="stSidebar"] input { color: #1e293b !important; }
     div[data-baseweb="select"] * { color: #1e293b !important; }
     [data-testid="stSidebar"] label { color: white !important; font-weight: 600; font-size: 0.9rem; }
-    
-    /* 5. Buttons */
     div.stButton > button:first-child {
         background-color: #ffffff;
         color: #0f172a;
@@ -86,16 +70,14 @@ st.markdown("""
 st.title("📈 Market Analyzer Pro")
 st.caption("One dashboard for all your finance things")
 
-# --- AI Engine ---
+# --- AI & Data Engine ---
 @st.cache_resource
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
-# --- HYBRID FETCHING LOGIC (With Formatting Fix) ---
 @st.cache_data(ttl=3600)
 def get_fundamental_info(ticker):
     stock = yf.Ticker(ticker)
-    
     # Strategy 1: Rich Data (Pro Mode)
     try:
         info = stock.info
@@ -120,10 +102,10 @@ def get_fundamental_info(ticker):
         fast = stock.fast_info
         return {
             "status": "Lite",
-            "mcap": format_currency(fast.market_cap), # Clean Format
+            "mcap": format_currency(fast.market_cap),
             "pe": "N/A (Lite)",
-            "high": format_currency(fast.year_high),  # Clean Format
-            "low": format_currency(fast.year_low),    # Clean Format
+            "high": format_currency(fast.year_high),
+            "low": format_currency(fast.year_low),
             "div": "N/A",
             "vol": f"{fast.last_volume:,}",
             "sector": "Basic Data Mode",
@@ -140,7 +122,7 @@ def get_price_history(ticker):
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
-# --- Master Ticker Lists ---
+# --- Ticker Lists ---
 INDICES = {"Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"}
 STOCKS = {
     "Adani Ent": "ADANIENT.NS", "Asian Paints": "ASIANPAINT.NS", "Axis Bank": "AXISBANK.NS",
@@ -195,7 +177,6 @@ if analyze_btn or st.session_state.run_analysis:
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
         with tabs[0]:
-            # Main Price Metrics
             current = history['Close'].iloc[-1]
             prev_close = history['Close'].iloc[-2]
             change = current - prev_close
@@ -204,14 +185,12 @@ if analyze_btn or st.session_state.run_analysis:
             st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
             st.caption("*Note: Data may have a 15-min delay.*")
             
-            # Detailed Stats Row (Always Safe)
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Open", f"₹{history['Open'].iloc[-1]:,.2f}")
             c2.metric("High", f"₹{history['High'].iloc[-1]:,.2f}")
             c3.metric("Low", f"₹{history['Low'].iloc[-1]:,.2f}")
             c4.metric("Prev. Close", f"₹{prev_close:,.2f}")
 
-            # Chart
             fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
             fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
@@ -255,7 +234,6 @@ if analyze_btn or st.session_state.run_analysis:
             data = get_fundamental_info(final_ticker)
             
             if data:
-                # API Status Badge
                 if data['status'] == "Pro":
                     st.success("API Status: Pro Mode (Live)")
                 else:
