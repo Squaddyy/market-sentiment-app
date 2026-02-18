@@ -17,7 +17,7 @@ def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Currency Formatter (The Fix for Ugly Lite Mode Numbers) ---
+# --- Currency Formatter ---
 def format_currency(value):
     if not isinstance(value, (int, float)): return value
     if value >= 1e12: return f"₹{value/1e12:.2f}T"
@@ -26,7 +26,7 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: THE "LASER-GUIDED" VISIBILITY FIX ---
+# --- CUSTOM CSS: THE "NUCLEAR" VISIBILITY FIX ---
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -36,60 +36,59 @@ st.markdown("""
         background-size: 30px 30px;
     }
     
-    /* 2. Sidebar Container */
+    /* 2. Sidebar Container - Dark Blue Gradient */
     [data-testid="stSidebar"] {
         background-image: linear-gradient(#1e293b, #0f172a);
         border-right: 1px solid #334155;
     }
 
-    /* 3. SIDEBAR LABELS (Keep these White) */
+    /* 3. SIDEBAR TEXT: Force Bright White */
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] .stMarkdown p {
-        color: #f8fafc !important;
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
     }
 
-    /* 4. SIDEBAR BUTTONS (The Fix: Force Dark Text) */
-    [data-testid="stSidebar"] .stButton > button {
-        background-color: #ffffff !important;
-        color: #0f172a !important; /* Dark Blue Text */
-        border: 1px solid #cbd5e1 !important;
-        font-weight: bold;
-    }
-    /* CRITICAL: Force the text inside the button to be Dark Blue */
-    [data-testid="stSidebar"] .stButton > button p {
-        color: #0f172a !important; 
-    }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        border-color: #3b82f6 !important;
-        color: #3b82f6 !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover p {
-        color: #3b82f6 !important;
-    }
-
-    /* 5. SIDEBAR INPUTS (The Fix: Dark Text in White Box) */
+    /* 4. INPUT BOXES: White Box, Dark Text */
     [data-testid="stSidebar"] input {
         color: #0f172a !important;
         background-color: #ffffff !important;
     }
-    
-    /* 6. DROPDOWNS (Fix Text Visibility) */
+    /* Fix Dropdown Menu */
     div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
     }
     div[data-baseweb="select"] span {
-        color: #0f172a !important;
+        color: #0f172a !important; 
     }
-    /* Fix the popup list items */
+    /* Fix the text inside the dropdown list when clicked */
     ul[data-testid="stSelectboxVirtualDropdown"] li span {
         color: #0f172a !important;
     }
+
+    /* 5. BUTTON STYLING (The Fix for Favorites) */
+    /* Forces button text to be Dark Blue so it's visible on White button */
+    div.stButton > button {
+        background-color: #ffffff !important;
+        color: #0f172a !important; /* This makes the text visible */
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
     
-    /* 7. METRIC CARDS */
+    /* 6. Metric Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
@@ -109,53 +108,6 @@ st.caption("One dashboard for all your finance things")
 @st.cache_resource
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
-
-# --- HYBRID DATA ENGINE (The Fix for API Blocks) ---
-@st.cache_data(ttl=3600)
-def get_fundamental_info(ticker):
-    stock = yf.Ticker(ticker)
-    
-    # Strategy 1: Rich Data (Pro Mode) - Tries the front door
-    try:
-        info = stock.info
-        if info and len(info) > 5:
-            return {
-                "status": "Pro",
-                "mcap": format_currency(info.get('marketCap', 0)),
-                "pe": f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A",
-                "high": format_currency(info.get('fiftyTwoWeekHigh', 0)),
-                "low": format_currency(info.get('fiftyTwoWeekLow', 0)),
-                "div": f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%",
-                "vol": format_currency(info.get('averageVolume', 0)),
-                "inst": info.get('heldPercentInstitutions', 0) * 100,
-                "insider": info.get('heldPercentInsiders', 0) * 100,
-                "sector": info.get('sector', 'N/A'),
-                "industry": info.get('industry', 'N/A')
-            }
-    except: pass
-    
-    # Strategy 2: Lite Data (Safe Mode) - Sneaks in the back door
-    # This runs if Strategy 1 fails (Rate Limit)
-    try:
-        fast = stock.fast_info
-        return {
-            "status": "Lite",
-            "mcap": format_currency(fast.market_cap), # Clean Format
-            "pe": "N/A (Lite)",
-            "high": format_currency(fast.year_high),  # Clean Format
-            "low": format_currency(fast.year_low),    # Clean Format
-            "div": "N/A",
-            "vol": format_currency(fast.last_volume),
-            "sector": "Basic Data Mode",
-            "industry": "Rate Limit Bypass Active"
-        }
-    except: return None
-
-def get_price_history(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        return stock.history(period="6mo")
-    except: return pd.DataFrame()
 
 with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
@@ -209,102 +161,95 @@ with st.sidebar:
 if analyze_btn or st.session_state.run_analysis:
     st.session_state.run_analysis = False
     
-    history = get_price_history(final_ticker)
-    
-    if not history.empty:
-        tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
+    try:
+        stock = yf.Ticker(final_ticker)
+        history = stock.history(period="6mo")
+        
+        if not history.empty:
+            tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
-        with tabs[0]:
-            current = history['Close'].iloc[-1]
-            prev_close = history['Close'].iloc[-2]
-            change = current - prev_close
-            pct_change = (change / prev_close) * 100
-            
-            st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
-            st.caption("*Note: Data may have a 15-min delay.*")
-            
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Open", f"₹{history['Open'].iloc[-1]:,.2f}")
-            c2.metric("High", f"₹{history['High'].iloc[-1]:,.2f}")
-            c3.metric("Low", f"₹{history['Low'].iloc[-1]:,.2f}")
-            c4.metric("Prev. Close", f"₹{prev_close:,.2f}")
+            with tabs[0]:
+                current = history['Close'].iloc[-1]
+                prev_close = history['Close'].iloc[-2]
+                change = current - prev_close
+                pct_change = (change / prev_close) * 100
+                
+                st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
+                st.caption("*Note: Data may have a 15-min delay.*")
+                
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Open", f"₹{history['Open'].iloc[-1]:,.2f}")
+                c2.metric("High", f"₹{history['High'].iloc[-1]:,.2f}")
+                c3.metric("Low", f"₹{history['Low'].iloc[-1]:,.2f}")
+                c4.metric("Prev. Close", f"₹{prev_close:,.2f}")
 
-            fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
-            fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True)
+                fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
+                fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True)
 
-        with tabs[1]:
-            try:
-                stock_obj = yf.Ticker(final_ticker)
-                news = stock_obj.news
-                if news:
-                    results = []
-                    prog = st.progress(0)
-                    articles_to_process = news[:num_articles]
-                    
-                    for i, art in enumerate(articles_to_process):
-                        prog.progress((i+1)/len(articles_to_process))
-                        story = art.get('content', {})
-                        if story.get('summary'):
-                            res = pipe(story['summary'])[0]
-                            results.append({"title": story['title'], "label": res['label'], "score": res['score']})
-                    prog.empty()
-                    
-                    if results:
-                        pos = sum(1 for r in results if r['label'] == 'positive')
-                        neg = sum(1 for r in results if r['label'] == 'negative')
+            with tabs[1]:
+                try:
+                    news = stock.news
+                    if news:
+                        results = []
+                        prog = st.progress(0)
+                        articles_to_process = news[:num_articles]
+                        for i, art in enumerate(articles_to_process):
+                            prog.progress((i+1)/len(articles_to_process))
+                            story = art.get('content', {})
+                            if story.get('summary'):
+                                res = pipe(story['summary'])[0]
+                                results.append({"title": story['title'], "label": res['label'], "score": res['score']})
+                        prog.empty()
                         
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Positive", pos)
-                        c2.metric("Negative", neg, delta_color="inverse")
-                        c3.metric("Market Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                        if results:
+                            pos = sum(1 for r in results if r['label'] == 'positive')
+                            neg = sum(1 for r in results if r['label'] == 'negative')
+                            c1, c2, c3 = st.columns(3)
+                            c1.metric("Positive", pos)
+                            c2.metric("Negative", neg, delta_color="inverse")
+                            c3.metric("Market Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                            st.divider()
+                            for r in results:
+                                emoji = "🟢" if r['label'] == 'positive' else "🔴" if r['label'] == 'negative' else "⚪"
+                                with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
+                                    st.write(f"**AI Confidence Score:** {r['score']:.2f}")
+                    else: st.info("No recent news found.")
+                except: st.warning("News unavailable.")
+
+            with tabs[2]:
+                st.subheader("📋 Fundamental Profile")
+                try:
+                    info = stock.info
+                    if info:
+                        k1, k2, k3 = st.columns(3)
+                        k1.metric("Market Cap", format_currency(info.get('marketCap', 0)))
+                        k1.metric("P/E Ratio", f"{info.get('trailingPE', 0):.2f}" if info.get('trailingPE') else "N/A")
+                        k2.metric("52W High", format_currency(info.get('fiftyTwoWeekHigh', 0)))
+                        k2.metric("52W Low", format_currency(info.get('fiftyTwoWeekLow', 0)))
+                        k3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "0%")
+                        k3.metric("Avg Volume", format_currency(info.get('averageVolume', 0)))
                         
                         st.divider()
-                        for r in results:
-                            emoji = "🟢" if r['label'] == 'positive' else "🔴" if r['label'] == 'negative' else "⚪"
-                            with st.expander(f"{emoji} {r['label'].upper()}: {r['title']}"):
-                                st.write(f"**AI Confidence Score:** {r['score']:.2f}")
-                else: st.info("No recent news found for analysis.")
-            except: st.warning("News feed temporarily unavailable.")
+                        st.subheader("🏦 Ownership & Peers")
+                        p1, p2 = st.columns(2)
+                        with p1:
+                            inst = info.get('heldPercentInstitutions', 0) * 100
+                            insider = info.get('heldPercentInsiders', 0) * 100
+                            fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
+                            fig_own.update_layout(title="Shareholding Pattern")
+                            st.plotly_chart(fig_own, use_container_width=True)
+                        with p2:
+                            st.write(f"**Sector:** {info.get('sector', 'N/A')}")
+                            st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                            st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
+                    else: st.error("Fundamental data not found.")
+                except Exception as e:
+                    st.error("⚠️ Fundamentals unavailable (Rate Limit or Data Missing).")
+                    if st.button("Retry Fetch 🔄"): st.rerun()
 
-        with tabs[2]:
-            st.subheader("📋 Fundamental Profile")
-            data = get_fundamental_info(final_ticker)
-            
-            if data:
-                # Optional: Show a tiny badge if in Lite Mode so you know why P/E is missing
-                if data['status'] == "Lite":
-                    st.caption("⚠️ API Rate Limit Active: Showing Real-Time Lite Data")
-
-                k1, k2, k3 = st.columns(3)
-                k1.metric("Market Cap", data['mcap'])
-                k1.metric("P/E Ratio", data['pe'])
-                k2.metric("52W High", data['high'])
-                k2.metric("52W Low", data['low'])
-                k3.metric("Div. Yield", data['div'])
-                k3.metric("Avg Volume", data['vol'])
-                
-                st.divider()
-                st.subheader("🏦 Ownership & Peers")
-                
-                if data['status'] == "Pro":
-                    p1, p2 = st.columns(2)
-                    with p1:
-                        inst = data['inst']
-                        insider = data['insider']
-                        fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
-                        fig_own.update_layout(title="Shareholding Pattern")
-                        st.plotly_chart(fig_own, use_container_width=True)
-                    with p2:
-                        st.write(f"**Sector:** {data['sector']}")
-                        st.write(f"**Industry:** {data['industry']}")
-                        st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
-                else:
-                    st.info("ℹ️ Ownership charts are paused in Lite Mode to maintain app stability.")
-            else:
-                st.error("⚠️ Fundamentals unavailable. Price & Sentiment remain live.")
-                if st.button("Force Retry 🔄"): st.cache_data.clear(); st.rerun()
-    else: st.error(f"Could not fetch data for {final_ticker}. Please check the ticker symbol.")
+        else: st.error("No price data found. Check ticker symbol.")
+    except Exception as e: st.error(f"Critical Error: {e}")
 
 else:
     # --- WELCOME SCREEN ---
@@ -331,7 +276,7 @@ else:
             try:
                 heat_results.append({"Label": sector, "Parent": "Market", "Performance": 0, "Size": 0})
                 for s in stocks:
-                    s_data = get_price_history(s)
+                    s_data = yf.Ticker(s).history(period="1d")
                     if not s_data.empty:
                         change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
                         heat_results.append({"Label": s.replace(".NS", ""), "Parent": sector, "Performance": change, "Size": abs(change) + 0.1})
