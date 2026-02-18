@@ -8,11 +8,13 @@ from transformers import pipeline
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# Initialize Favorites in Session State if not exists
+# Initialize Session State for Persistence
 if 'favorites' not in st.session_state:
     st.session_state.favorites = []
+if 'current_ticker' not in st.session_state:
+    st.session_state.current_ticker = None
 
-# CUSTOM CSS: Premium Terminal aesthetic and text visibility
+# CUSTOM CSS: Fixed text visibility and Terminal design
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -88,21 +90,24 @@ with st.sidebar:
     manual_ticker = st.text_input("OR Type Any Ticker (e.g. IRFC.NS):", "")
     ticker = manual_ticker.upper() if manual_ticker else dropdown_ticker
     
+    # Update Session State when sidebar selection changes
+    st.session_state.current_ticker = ticker
+    
     st.markdown(f"""
         <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; border-left: 5px solid #60a5fa;">
             <span style="font-size: 0.8em; color: #94a3b8;">Targeting:</span><br>
-            <strong style="color: white; font-size: 1.1em;">{ticker}</strong>
+            <strong style="color: white; font-size: 1.1em;">{st.session_state.current_ticker}</strong>
         </div>
     """, unsafe_allow_html=True)
     
     # FAVORITES TOGGLE
     if st.button("⭐ Add/Remove Favorite"):
-        if ticker in st.session_state.favorites:
-            st.session_state.favorites.remove(ticker)
-            st.toast(f"Removed {ticker} from favorites")
+        if st.session_state.current_ticker in st.session_state.favorites:
+            st.session_state.favorites.remove(st.session_state.current_ticker)
+            st.toast(f"Removed {st.session_state.current_ticker} from favorites")
         else:
-            st.session_state.favorites.append(ticker)
-            st.toast(f"Added {ticker} to favorites")
+            st.session_state.favorites.append(st.session_state.current_ticker)
+            st.toast(f"Added {st.session_state.current_ticker} to favorites")
 
     st.write("")
     num_articles = st.slider("Analysis Depth (Articles):", 5, 50, 15)
@@ -113,10 +118,17 @@ with st.sidebar:
     st.markdown("### 🛠️ Built by **Squaddyy**")
     st.caption("Your neighborhood programmer")
 
+# Function to handle Favorite button clicks
+def set_and_analyze(fav_ticker):
+    st.session_state.current_ticker = fav_ticker
+    st.rerun()
+
 # --- MAIN DASHBOARD LOGIC ---
-if analyze_btn:
+if analyze_btn or st.session_state.current_ticker != ticker:
+    # Use the session state ticker for the main analysis
+    active_ticker = st.session_state.current_ticker
     try:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(active_ticker)
         tabs = st.tabs(["📈 Price Dynamics", "📰 AI Sentiment", "📋 Fundamentals & Peers"])
 
         with tabs[0]:
@@ -133,7 +145,7 @@ if analyze_btn:
                 change = current - prev_close
                 pct_change = (change / prev_close) * 100
 
-                st.metric(label=f"{ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
+                st.metric(label=f"{active_ticker} Current", value=f"₹{current:,.2f}", delta=f"{change:.2f} ({pct_change:.2f}%)")
                 st.caption("*Note: Data may have a 15-min delay (Standard for free APIs).*")
                 
                 t1, t2, t3, t4 = st.columns(4)
@@ -213,7 +225,7 @@ if analyze_btn:
     except Exception as e:
         st.error(f"Analysis Error: {e}")
 else:
-    # --- UPDATED WELCOME SCREEN WITH HEATMAP & FAVORITES ---
+    # --- UPDATED WELCOME SCREEN WITH LIVE HEATMAP & FAVORITES ---
     st.subheader(f"👋 Welcome to your terminal!")
     
     col_fav, col_heat = st.columns([1, 2])
@@ -222,21 +234,36 @@ else:
         st.markdown("### ⭐ Your Favorites")
         if st.session_state.favorites:
             for fav in st.session_state.favorites:
-                st.button(f"🔍 Analyze {fav}", key=fav, on_click=lambda f=fav: st.write(f"Selected {f} (Hit Analysis button below)"))
+                if st.button(f"🔍 Analyze {fav}", key=f"btn_{fav}"):
+                    set_and_analyze(fav)
         else:
             st.write("No favorites yet. Add some in the sidebar!")
 
     with col_heat:
-        st.markdown("### 🗺️ Sector Heatmap (Sample)")
-        # Sample Heatmap Data
-        heatmap_data = pd.DataFrame({
-            "Sector": ["Banking", "IT", "Energy", "Consumer", "Auto", "Pharma"],
-            "Performance": [1.2, -0.8, 2.5, 0.4, -1.5, 0.9],
-            "Parent": ["Market", "Market", "Market", "Market", "Market", "Market"]
-        })
-        fig_heat = px.treemap(heatmap_data, path=['Parent', 'Sector'], values=[1,1,1,1,1,1],
-                             color='Performance', color_continuous_scale='RdYlGn',
-                             range_color=[-3, 3])
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.markdown("### 🗺️ Live Sector Performance (Nifty)")
+        # Fetching Live Nifty Sector Performance
+        sectors = {
+            "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "Nifty Auto": "NIFTY_AUTO.NS", 
+            "Nifty Pharma": "NIFTY_PHARMA.NS", "Nifty Metal": "NIFTY_METAL.NS", "Nifty Energy": "NIFTY_ENERGY.NS"
+        }
+        
+        heat_results = []
+        for name, tick in sectors.items():
+            try:
+                s_data = yf.Ticker(tick).history(period="1d")
+                change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
+                heat_results.append({"Sector": name, "Performance": change, "Parent": "Market"})
+            except:
+                continue
+                
+        if heat_results:
+            df_heat = pd.DataFrame(heat_results)
+            fig_heat = px.treemap(df_heat, path=['Parent', 'Sector'], values=[1]*len(df_heat),
+                                 color='Performance', color_continuous_scale='RdYlGn',
+                                 color_continuous_midpoint=0, range_color=[-3, 3])
+            fig_heat.update_layout(margin=dict(t=0, l=0, r=0, b=0))
+            st.plotly_chart(fig_heat, use_container_width=True)
+        else:
+            st.warning("Sector performance data currently unavailable.")
 
-    st.info("Ready to analyze? Select an instrument from the sidebar and hit **Execute Analysis**.")
+    st.info("Ready to analyze? Select an instrument from the sidebar or click a favorite and hit **Execute Analysis**.")
