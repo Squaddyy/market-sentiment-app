@@ -1,6 +1,6 @@
 # 📈 Market Analyzer Pro
 
-**One dashboard for all your finance things.** *Built by [Your Name/Squaddyy] - Your neighborhood programmer*
+**One dashboard for all your finance things.** *Built by [Squaddyy] - Your neighborhood programmer*
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://squadystock.streamlit.app/)
 
