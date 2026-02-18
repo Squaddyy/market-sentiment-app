@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from transformers import pipeline
-import time
 
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
@@ -19,7 +18,7 @@ def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# --- Premium Terminal CSS (Full Restoration) ---
+# --- Premium Terminal CSS ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -58,13 +57,36 @@ st.caption("One dashboard for all your finance things")
 def load_model():
     return pipeline("text-classification", model="ProsusAI/finbert")
 
-# Separate function for Fundamentals (The "Heavy" Call)
-# TTL set to 1 hour to prevent constant hitting of the rate limit
+# HYBRID FETCHING FUNCTION [The Fix]
+# Attempts rich data first, falls back to "Lite" mode if blocked
 @st.cache_data(ttl=3600)
 def get_fundamental_info(ticker):
+    stock = yf.Ticker(ticker)
+    
+    # Strategy 1: Attempt Rich Data
     try:
-        stock = yf.Ticker(ticker)
-        return stock.info
+        info = stock.info
+        if info and len(info) > 5:
+            return info
+    except:
+        pass # Fail silently and try Strategy 2
+    
+    # Strategy 2: Lite Mode (fast_info) - Almost never blocked
+    try:
+        fast = stock.fast_info
+        # We construct a "Lite" dictionary to keep the UI running
+        return {
+            'marketCap': fast.market_cap,
+            'fiftyTwoWeekHigh': fast.year_high,
+            'fiftyTwoWeekLow': fast.year_low,
+            'averageVolume': fast.last_volume,
+            'trailingPE': 'N/A (Lite)', # Not available in fast_info
+            'dividendYield': 0,
+            'heldPercentInstitutions': 0,
+            'heldPercentInsiders': 0,
+            'sector': 'Basic Data Mode',
+            'industry': 'Rate Limit Bypass Active'
+        }
     except:
         return None
 
@@ -194,10 +216,10 @@ if analyze_btn or st.session_state.run_analysis:
         with tabs[2]:
             st.subheader("📋 Fundamental Profile")
             
-            # Try to get cached info. If blocked, it returns None.
+            # HYBRID CALL: Will use Lite Mode if blocked
             info = get_fundamental_info(final_ticker)
             
-            if info and len(info) > 10:
+            if info:
                 # Full Rich UI
                 k1, k2, k3 = st.columns(3)
                 k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
@@ -209,21 +231,25 @@ if analyze_btn or st.session_state.run_analysis:
                 
                 st.divider()
                 st.subheader("🏦 Ownership & Peers")
-                p1, p2 = st.columns(2)
-                with p1:
-                    inst = info.get('heldPercentInstitutions', 0) * 100
-                    insider = info.get('heldPercentInsiders', 0) * 100
-                    fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
-                    fig_own.update_layout(title="Shareholding Pattern")
-                    st.plotly_chart(fig_own, use_container_width=True)
-                with p2:
-                    st.write(f"**Sector:** {info.get('sector', 'N/A')}")
-                    st.write(f"**Industry:** {info.get('industry', 'N/A')}")
-                    st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
+                
+                # If we are in Lite Mode, we might not have ownership data
+                if info.get('sector') != 'Basic Data Mode':
+                    p1, p2 = st.columns(2)
+                    with p1:
+                        inst = info.get('heldPercentInstitutions', 0) * 100
+                        insider = info.get('heldPercentInsiders', 0) * 100
+                        fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
+                        fig_own.update_layout(title="Shareholding Pattern")
+                        st.plotly_chart(fig_own, use_container_width=True)
+                    with p2:
+                        st.write(f"**Sector:** {info.get('sector', 'N/A')}")
+                        st.write(f"**Industry:** {info.get('industry', 'N/A')}")
+                        st.info("💡 Compare this P/E with industry averages to find valuation gaps.")
+                else:
+                    st.info("ℹ️ Running in 'Lite Mode' due to API rate limits. Ownership charts temporarily paused.")
             else:
-                # Graceful Failure: Shows warning ONLY in this tab
-                st.warning("⚠️ Fundamentals are temporarily rate-limited. Price & Sentiment remain live.")
-                st.caption("This usually resets in 15-30 minutes. The rest of the app is fully functional.")
+                # Ultimate Fallback if even Lite Mode fails (Rare)
+                st.warning("⚠️ Fundamentals unavailable. Price & Sentiment remain live.")
                 if st.button("Force Retry 🔄"):
                     st.cache_data.clear()
                     st.rerun()
