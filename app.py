@@ -8,7 +8,7 @@ from transformers import pipeline
 # 1. Page Configuration & Professional UI Styling
 st.set_page_config(page_title="Market Analyzer Pro", page_icon="📈", layout="wide")
 
-# Initialize Session State
+# Initialize Session State for Persistence
 if 'favorites' not in st.session_state:
     st.session_state.favorites = []
 if 'manual_ticker' not in st.session_state:
@@ -16,25 +16,43 @@ if 'manual_ticker' not in st.session_state:
 if 'run_analysis' not in st.session_state:
     st.session_state.run_analysis = False
 
-# CALLBACK: Fixes the Favorites buttons by updating state and triggering rerun
+# CALLBACK: Fixes Favorites by updating state and triggering rerun
 def select_favorite(ticker):
     st.session_state.manual_ticker = ticker
     st.session_state.run_analysis = True
 
-# CUSTOM CSS: High-contrast text and Premium Terminal design
+# CUSTOM CSS: Fixed text visibility and Terminal design
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    [data-testid="stSidebar"] { background-image: linear-gradient(#1e293b, #0f172a); color: white; }
+    .stMetric { 
+        background-color: #ffffff; 
+        padding: 15px; 
+        border-radius: 10px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    }
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(#1e293b, #0f172a);
+        color: white;
+    }
     [data-testid="stSidebar"] input { color: #1e293b !important; }
     div[data-baseweb="select"] * { color: #1e293b !important; }
     [data-testid="stSidebar"] label { color: white !important; font-weight: 600; }
-    div.stButton > button:first-child { background-color: #ffffff; color: #0f172a; border-radius: 8px; font-weight: bold; width: 100%; }
+
+    div.stButton > button:first-child {
+        background-color: #ffffff;
+        color: #0f172a;
+        border-radius: 8px;
+        font-weight: bold;
+        border: none;
+        height: 3em;
+        width: 100%;
+    }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
+# DASHBOARD HEADER
 st.title("📈 Market Analyzer Pro")
 st.caption("One dashboard for all your finance things")
 
@@ -47,7 +65,10 @@ with st.spinner("Initializing AI Engines..."):
     pipe = load_model()
 
 # --- THE MEGA LIST ---
-INDICES = {"Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"}
+INDICES = {
+    "Nifty 50": "^NSEI", "Sensex": "^BSESN", "Nifty Bank": "^NSEBANK", "Nifty IT": "^CNXIT", "S&P 500": "^GSPC"
+}
+
 STOCKS = {
     "Adani Ent": "ADANIENT.NS", "Asian Paints": "ASIANPAINT.NS", "Axis Bank": "AXISBANK.NS",
     "Bajaj Finance": "BAJFINANCE.NS", "Bharti Airtel": "BHARTIARTL.NS", "Coal India": "COALINDIA.NS",
@@ -108,12 +129,26 @@ if analyze_btn or st.session_state.get('run_analysis'):
         with tabs[0]:
             history = stock.history(period="6mo")
             if not history.empty:
-                info = stock.info
-                current = info.get('currentPrice') or history['Close'].iloc[-1]
-                prev_close = info.get('previousClose') or history['Close'].iloc[-2]
+                try:
+                    info = stock.info
+                    current = info.get('currentPrice') or history['Close'].iloc[-1]
+                    prev_close = info.get('previousClose') or history['Close'].iloc[-2]
+                except:
+                    current = history['Close'].iloc[-1]
+                    prev_close = history['Close'].iloc[-2]
+
                 st.metric(label=f"{final_ticker} Current", value=f"₹{current:,.2f}", delta=f"{current - prev_close:.2f}")
                 st.caption("*Note: Data may have a 15-min delay.*")
                 
+                t1, t2, t3, t4 = st.columns(4)
+                try:
+                    t1.metric("Open", f"₹{info.get('open', 'N/A')}")
+                    t2.metric("High", f"₹{info.get('dayHigh', 'N/A')}")
+                    t3.metric("Low", f"₹{info.get('dayLow', 'N/A')}")
+                    t4.metric("Close (Prev)", f"₹{prev_close:,.2f}")
+                except:
+                    st.caption("Technical details temporarily limited.")
+
                 fig = go.Figure(data=[go.Candlestick(x=history.index, open=history['Open'], high=history['High'], low=history['Low'], close=history['Close'])])
                 fig.update_layout(xaxis_rangeslider_visible=False, height=550, template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
@@ -122,31 +157,47 @@ if analyze_btn or st.session_state.get('run_analysis'):
             news = stock.news
             if news:
                 results = []
-                for art in news[:num_articles]:
+                prog = st.progress(0)
+                articles_to_process = news[:num_articles]
+                for i, art in enumerate(articles_to_process):
+                    prog.progress((i+1)/len(articles_to_process))
                     story = art.get('content', {})
                     if story.get('summary'):
                         res = pipe(story['summary'])[0]
                         results.append({"title": story['title'], "label": res['label']})
+                prog.empty()
+                
                 if results:
-                    c1, c2 = st.columns(2)
                     pos = sum(1 for r in results if r['label'] == 'positive')
                     neg = sum(1 for r in results if r['label'] == 'negative')
-                    c1.metric("Sentiment", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
-                    for r in results: st.write(f"- {r['title']}")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Positive", pos)
+                    c2.metric("Negative", neg, delta_color="inverse")
+                    c3.metric("Market Mood", "BULLISH 🐂" if pos > neg else "BEARISH 🐻")
+                    st.divider()
+                    for r in results:
+                        st.write(f"- {r['title']}")
 
         with tabs[2]:
-            st.subheader("📋 Fundamentals")
+            st.subheader("📋 Fundamental Profile")
             try:
                 info = stock.info
-                k1, k2 = st.columns(2)
+                k1, k2, k3 = st.columns(3)
                 k1.metric("Market Cap", f"₹{info.get('marketCap', 0):,}")
                 k2.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
+                k3.metric("52W High", f"₹{info.get('fiftyTwoWeekHigh', 0):,}")
+                
+                st.divider()
+                st.subheader("🏦 Ownership Pattern")
                 inst = info.get('heldPercentInstitutions', 0) * 100
-                fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Retail'], values=[inst, 100-inst], hole=.3)])
+                insider = info.get('heldPercentInsiders', 0) * 100
+                fig_own = go.Figure(data=[go.Pie(labels=['Inst', 'Insider', 'Retail'], values=[inst, insider, 100-inst-insider], hole=.3)])
                 st.plotly_chart(fig_own, use_container_width=True)
-            except: st.error("Data unavailable.")
+            except:
+                st.error("Fundamental data unavailable.")
 
-    except Exception as e: st.error(f"Error: {e}")
+    except Exception as e:
+        st.error(f"Analysis Error: {e}")
 else:
     # --- WELCOME SCREEN WITH PRO DRILL-DOWN HEATMAP ---
     st.subheader(f"👋 Welcome to your terminal!")
@@ -157,36 +208,48 @@ else:
         if st.session_state.favorites:
             for fav in st.session_state.favorites:
                 st.button(f"🔍 Analyze {fav}", key=f"fav_{fav}", on_click=select_favorite, args=(fav,))
-        else: st.write("Add favorites in the sidebar!")
+        else:
+            st.write("Add favorites in the sidebar!")
 
     with col_heat:
         st.markdown("### 🗺️ Live Market Map (Drill-down Enabled)")
-        # PRO DATA: Mapping Sectors to constituents
+        # Mapping Sectors to their Top constituent stocks
         sector_map = {
             "Nifty Bank": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS"],
             "Nifty IT": ["TCS.NS", "INFY.NS", "HCLTECH.NS"],
-            "Nifty Auto": ["TATAMOTORS.NS", "MARUTI.NS"],
-            "Nifty Energy": ["RELIANCE.NS", "NTPC.NS"]
+            "Nifty Auto": ["TATAMOTORS.NS", "MARUTI.NS", "BAJAJ-AUTO.NS"],
+            "Nifty Energy": ["RELIANCE.NS", "NTPC.NS", "ONGC.NS"]
         }
+        
         heat_results = []
         for sector, stocks in sector_map.items():
             try:
-                # Add sector base
-                heat_results.append({"Label": sector, "Parent": "Market", "Performance": 0})
+                heat_results.append({"Label": sector, "Parent": "Market", "Performance": 0, "Size": 0})
                 for s in stocks:
                     s_data = yf.Ticker(s).history(period="1d")
-                    change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
-                    heat_results.append({"Label": s.replace(".NS", ""), "Parent": sector, "Performance": change})
+                    if not s_data.empty:
+                        change = ((s_data['Close'].iloc[-1] - s_data['Open'].iloc[0]) / s_data['Open'].iloc[0]) * 100
+                        heat_results.append({
+                            "Label": s.replace(".NS", ""), 
+                            "Parent": sector, 
+                            "Performance": change, 
+                            "Size": abs(change) + 0.1
+                        })
             except: continue
                 
         if heat_results:
             df_heat = pd.DataFrame(heat_results)
-            # Treemap with hierarchy to allow drilling down
-            fig_heat = px.treemap(df_heat, path=['Parent', 'Label'], values=[1]*len(df_heat),
-                                 color='Performance', color_continuous_scale='RdYlGn',
-                                 color_continuous_midpoint=0, range_color=[-3, 3])
+            fig_heat = px.treemap(
+                df_heat, path=['Parent', 'Label'], values='Size',
+                color='Performance', color_continuous_scale='RdYlGn',
+                color_continuous_midpoint=0, range_color=[-3, 3],
+                custom_data=['Performance']
+            )
+            fig_heat.update_traces(
+                texttemplate="<b>%{label}</b><br>%{customdata[0]:.2f}%",
+                hovertemplate="<b>%{label}</b><br>Change: %{customdata[0]:.2f}%"
+            )
             fig_heat.update_layout(margin=dict(t=0, l=0, r=0, b=0))
-            fig_heat.update_traces(textinfo="label+value")
             st.plotly_chart(fig_heat, use_container_width=True)
 
-    st.info("Select a stock or click a favorite to start analysis.")
+    st.info("Select an instrument or click a favorite and hit **Execute Analysis**.")
