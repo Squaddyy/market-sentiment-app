@@ -26,7 +26,7 @@ def format_currency(value):
     elif value >= 1e5: return f"₹{value/1e5:.2f}L"
     else: return f"₹{value:,.2f}"
 
-# --- CUSTOM CSS: High Contrast Sidebar ---
+# --- CUSTOM CSS: THE "NUCLEAR" VISIBILITY FIX ---
 st.markdown("""
     <style>
     /* 1. Main Background */
@@ -36,62 +36,65 @@ st.markdown("""
         background-size: 30px 30px;
     }
     
-    /* 2. Cards */
+    /* 2. Sidebar Container - Dark Blue Gradient */
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(#1e293b, #0f172a);
+        border-right: 1px solid #334155;
+    }
+
+    /* 3. SIDEBAR TEXT: Force Bright White */
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+    }
+
+    /* 4. INPUT BOXES: White Box, Dark Text */
+    [data-testid="stSidebar"] input {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+    }
+    /* Fix Dropdown Menu */
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #0f172a !important; 
+    }
+    /* Fix the text inside the dropdown list when clicked */
+    ul[data-testid="stSelectboxVirtualDropdown"] li span {
+        color: #0f172a !important;
+    }
+
+    /* 5. BUTTON STYLING (The Fix for Favorites) */
+    /* Forces button text to be Dark Blue so it's visible on White button */
+    div.stButton > button {
+        background-color: #ffffff !important;
+        color: #0f172a !important; /* This makes the text visible */
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
+    
+    /* 6. Metric Cards */
     .stMetric { 
         background-color: #ffffff; 
         padding: 15px; 
         border-radius: 10px; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
         border: 1px solid #e2e8f0;
-    }
-
-    /* 3. Sidebar Container */
-    [data-testid="stSidebar"] {
-        background-image: linear-gradient(#1e293b, #0f172a);
-        border-right: 1px solid #334155;
-    }
-    
-    /* 4. Sidebar Text Fixes (Force White/Light) */
-    [data-testid="stSidebar"] h1, 
-    [data-testid="stSidebar"] h2, 
-    [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] label {
-        color: #f8fafc !important; /* Bright White-Blue */
-    }
-    
-    /* 5. Sidebar Caption Fix */
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        color: #cbd5e1 !important; /* Light Gray for captions */
-    }
-    
-    /* 6. Input Box Fixes (White Box, Dark Text) */
-    [data-testid="stSidebar"] input { 
-        color: #0f172a !important; 
-        font-weight: 600;
-    }
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #0f172a !important;
-    }
-    
-    /* 7. Button Styling */
-    div.stButton > button:first-child {
-        background-color: #ffffff;
-        color: #0f172a;
-        border-radius: 8px;
-        font-weight: bold;
-        border: none;
-        height: 3em;
-        width: 100%;
-        transition: all 0.3s ease;
-    }
-    div.stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
     footer {visibility: hidden;}
